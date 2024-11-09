@@ -1,12 +1,328 @@
 # Changes to the Mapbox Navigation SDK for iOS
 
+## v3.5.0
+
+### Map
+
+* Fixed an issue where a destination waypoint is not displayed when `NavigationMapView.showsIntermediateWaypoints` was set to `false`.
+
+## v3.5.0-rc.2
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxNavigationNative v321.0.0-rc.2](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/321.0.0-rc.2).
+* Fixed the version format of the MapboxNavigationNative in the `Info.plist` for pre-releases.
+
+## v3.5.0-rc.1
+
+* MapboxNavigationCore now requires [MapboxNavigationNative v321.0.0-rc.1](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/321.0.0-rc.1).
+* MapboxNavigationCore now requires [MapboxMaps v11.8.0-rc.1](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.8.0-rc.1).
+
+### ⚠️ Behavioral Changes ⚠️:
+
+* The final destination is now displayed as a waypoint circle layer instead of a point annotation. Use 'AnnotationOrchestrator.makePointAnnotationManager()' to create your own annotation manager to add the final destination annotation to the map. For more information see the following guide: https://docs.mapbox.com/ios/maps/guides/markers-and-annotations/annotations/#markers. To hide a particular waypoint, use `NavigationMapViewDelegate.navigationMapView(_:shapeFor:legIndex:)` method to supply `Feature.properties` with data that allow to distinguish waypoints. Use these properties data in `CircleLayer.circleOpacity` expression to control waypoints visibility.
+* Updated the default visual style of waypoits. To customize waypoint representation, use `NavigationMapViewDelegate.navigationMapView(_:waypointCircleLayerWithIdentifier:sourceIdentifier:)` method to create your own `CircleLayer` for waypoints.
+
+### API deprecations:
+
+* `NavigationMapView.pointAnnotationManager` property is deprecated and should no longer be used, as the final destination annotation is no longer added to the map.
+* `NavigationMapView.navigationMapView(_, didAdd:pointAnnotationManager:)` method is deprecated and should no longer be used, as the final destination annotation is no longer added to the map.
+
+### CarPlay:
+
+* Update navigation buttons style.
+* Fixed inconsistent state while ending active navigation.
+* Updated navigation buttons style.
+* `CarPlayMapViewController` does not automatically change the state to free drive when it appears if the previous state was different than `idle`.
+
+### Routing
+
+* Fixed map matching bug after leaving a tunnel.
+* Increased route stickiness in dead reckoning mode.
+* Improved odometry and road graph fusing in urban canyons.
+
+### Other changes
+
+* Added support for a special speed limit sign for no speed limit zones.
+* Fixed a possible force `nil` unwrapping in `NavigationViewController.styleManager`.
+
+## v3.5.0-beta.1
+
+### API deprecations:
+
+* `RoutingConfig.init(alternativeRoutesDetectionSettings:fasterRouteDetectionSettings:rerouteSettings:initialManeuverAvoidanceRadius:routeRefreshPeriod:routingProviderSource:prefersOnlineRoute:detectsReroute:)` initializer is deprecated in favor of `RoutingConfig.init(alternativeRoutesDetectionConfig:fasterRouteDetectionConfig:rerouteConfig:initialManeuverAvoidanceRadius:routeRefreshPeriod:routingProviderSource:prefersOnlineRoute:)`. 
+
+### Map
+
+* An alternative route is hidden on the map right after an alternative starting fork point is passed.
+* Fixed a double call of `NavigationComponent.onDidReroute()`.
+* Fixed a possible case when `.relativeDurationsOnAlternativeManuever` annotations can be visible even if they were hidden previously.
+* Added the support for specifying the custom route line layer position for map styles without slots support by `NavigationMapView.customRouteLineLayerPosition`.
+
+### Location
+
+* Fixed the case when a raw, non-map-matched location was used in CarPlay.
+
+### Other changes
+
+* `NavigationViewController` transitions navigation to the `idle` state when it is dismissed.
+* Added the ability to configure predictive cache for search by 'PredictiveCacheConfig.predictiveCacheSearchConfig'.
+
+## v3.4.0
+
+* MapboxNavigationCore now requires [MapboxNavigationNative v320.0.0](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/320.0.0).
+* MapboxNavigationCore now requires [MapboxMaps v11.7.0](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.7.0).
+
+### Routing
+
+* `NavigationRouteOptions` and `NavigationMatchOptions` no longer include `.numericCongestionLevel` attribute by default for profiles other than `.automobileAvoidingTraffic`.
+
+### Map
+
+* Fixed warnings `Slot 'middle' missing for layer`.
+* Fixed possible incorrect route line layer order for map styles without slot support causing top layers to appear beneath the navigation route line.
+
+## v3.4.0-rc.1
+
+### Map
+
+* Added API `NavigationMapView.excludedRouteAlertTypes` for controlling the visibility of road alerts on the map.
+* Fixed a case when a far maneuver was framed by the navigation camera calculation with `PitchNearManeuver.enabled`. The distance to maneuver can be configured correctly by `PitchNearManeuver.triggerDistanceToManeuver`.
+
+### Other changes
+
+* Fixed possible issue when the "_NONEXISTENT_KEY_VALUE_" value could have been displayed when the custom localization bundle was used and the debug option “Show non-localized strings” was enabled in Xcode.
+
+## v3.4.0-beta.1
+
+### Map
+
+* Updated appearance and placement mechanism of the route line callouts.
+* Fixed extra coordinates outside `lookaheadDistance` for the maneuver added for the following navigation camera calculation. The camera frame can now be configured correctly by `IntersectionDensity`.
+
+### CarPlay
+
+* Added new method `previewRoutes(to destination: Waypoint) async` in CarPlayManager.
+* Added new method `previewRoutes(between waypoints: [Waypoint]) async` in CarPlayManager.
+* Added new method `previewRoutes(for options: RouteOptions) async` in CarPlayManager.
+
+### Location
+
+* Fixed the issue that a map-matched location was sent instead of a raw location in `MapMatchingState.location`. Switch to `MapMatchingState.enhancedLocation` if you need a map-matched location.
+
+### Other changes
+
+* `NavigatorErrors.UnexpectedNavigationStatus` is now public.
+* Improved Telemetry UI-related data collection from the main thread.
+* Reported road names will now also respect user languages preferences.
+* Fixed a UI bug when the opened steps list view was not updated and sometimes had a blank space at the top.
+* Added more feedback categories for Active Guidance.
+* Added missing languages for the `SAME_TIME` label localization.
+
+## v3.3.1
+
+### Routing
+
+* Ignore an alternative route and return non-nil `NavigationRoutes` when switching to an alternative and an invalid fork point was found.
+
+### Other changes
+
+* Fixed incorrect playback ducking while voice instructions are muted.
+* Fixed too low voice instructions volume when device volume was not maxed out.
+
+## v3.3.0
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxNavigationNative v317.0.0](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/317.0.0).
+* MapboxNavigationCore now requires [MapboxMaps v11.6.0](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.6.0).
+
+## v3.3.0-rc.1
+
+### Map
+
+* Fixed an issue when an alternative route was not selected when clicking on the route annotations on the map.
+* Fixed an issue when the tap on the overlapping part of the main and alternative route was considered as an alternative route tap.
+* Fixed an issue when a leg separating waypoint was not selected after it was clicked on the map.
+
+### Routing
+
+* Fixed an issue when the main route was incorrectly parsed as an alternative after switching to an alternative.
+
+### CarPlay
+
+* The `CarPlayViewportDataSource.currentNavigationCameraOptions` property is now read-write to provide a way to change navigation camera options in CarPlay. 
+
+### Other changes
+
+* Fixed unwanted road movement simulation when using static GPX files to simulate location.
+* Added `LocalizationManager` to support the ability to provide custom localization for specific strings in the SDK when `LocalizationManager.customLocalizationBundle` is set.
+* Extended `NavigationLocationManager` subclassing posibilities by opening the some members to public visibility or overriding.
+* Fixed the route progress simulation resetting when selecting an alternative route during active guidance.
+* Added `AlternativesStatus.Events.SwitchedToAlternative` event to track when the navigator switched to the alternative route.
+
+## v3.3.0-beta.1
+
+### CarPlay
+
+* Fixed CarPlay crash when calling `CarPlayManager.routePreview()` method.
+
+### Banners and guidance instructions
+
+* Fixed a bug when a published event about a banner or spoken instruction was sent before `RouteProgress` was updated.
+* Fixed default local notification scheduling.
+
+### Other changes
+
+* The shared instance of `RouteVoiceController` is now strongly stored after the first instantiation to avoid creating multiple instances.
+* Fixed a bug with a map matching response parsing for silent waypoints.
+* `Tracepoint.waypointIndex` is now an optional property.
+
+## v3.2.0
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxNavigationNative v314.0.0](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/314.0.0).
+* MapboxNavigationCore now requires [MapboxMaps v11.5.1](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.5.1).
+
+### Map
+
+* Fixed an extra large bottom margin of the following navigation camera.
+* Fixed a bug when the custom camera viewport was not applied.
+* Fixed a bug with incorrect camera center when custom `GeometryFramingAfterManeuver.distanceToFrameAfterManeuver` is set.
+
+### Other changes
+
+* Fixed the incorrect `RouteAlert.distanceToStart` when active guidance is in progress.
+* Fixed a bug when not faster routes detection was not started even if it was enabled by `FasterRouteDetectionConfig`.
+
+## v3.2.0-rc.1
+
+### Other changes
+
+* Supported the ability to notify about the navigation-related error by adding `NavigationController.errors`.
+
+## v3.2.0-beta.1
+
+### API deprecations:
+
+* `CarPlaySearchController` conformance to `CPListTemplateDelegate` is deprecated in favor of `CPListItem.handler`. 
+
+### Map
+
+* Fixed an incorrect viewport padding in the overview route camera. 
+* Added `NavigationMapViewDelegate.navigationMapView(_:willAdd:)`, `NavigationViewControllerDelegate.navigationViewController(_:willAdd:)`, and `CarPlayManagerDelegate.carPlayManager(_:willAdd:for:)` to modify the properties of the default layer which will be added to the map view during navigation.
+* Added `NavigationMapView.showsRelativeDurationsOnAlternativeManuever` flag to toggle ETA callouts displaying during Active Guidance.
+* Added `NavigationMapViewDelegate.navigationMapView(_:,didAddRedrawActiveGuidanceRoutes:)` method to monitor when view has refreshed the routes in Active Guidance.
+
+### Routing
+
+* Added `NavigationRoutes.refreshInvalidationDate` property and `RefreshingStatus.Invalidated` event to track when route refreshing has expired and new route request is required.
+
+### Other changes
+
+* Fixed sending "end of the route" feedback.
+* Added a new `ActiveNavigationFeedbackType` enum case `.arrival(rating:)`.
+* Added`HistoryReplayController` wrapped as a custom static `LocationClient.historyReplayingValue(with:)`, which allows replaying history files.
+* Added static method `Directions.url(forCalculating:credentials:httpMethod:)` for generating a request URL without creating the `Directions` instance.
+* Added default value `CongestionRangesConfiguration.default` for `RouteProgress.init(navigationRoutes:waypoints:congestionConfiguration:)` constructor.
+* `CarPlayManager` fix problem with dismiss preview mode. 
+
+## v3.1.0
+
+### API deprecations:
+
+* `CarPlayNavigationViewController.waypointStyle`. This feature no longer has any effect.
+
+### Map
+
+* The camera no longer crashes if one passed an invalid center coordinate to the camera transition.
+* Fixed the incorrect components layout of `NavigationView` after trait collection changed.
+* Support the ability to not display alternative routes on the map.
+
+## v3.1.0-rc.1
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxCommon v24.4.0-rc.2](https://github.com/mapbox/mapbox-common-ios/releases/tag/v24.4.0-rc.2). ([#4656](https://github.com/mapbox/mapbox-navigation-ios/pull/4656))
+* MapboxNavigationCore now requires [MapboxNavigationNative v309.0.0](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/309.0.0). ([#4656](https://github.com/mapbox/mapbox-navigation-ios/pull/4656))
+
+### Map
+
+* Added the ability to configure routeline, route annotation, and maneuver arrow colors in `NavigationMapView`.
+* Added the ability to configure `circleLayer`, `symbolLayer`, and `shape` for intermediate waypoints in `NavigationMapView`, `NavigationViewController`, `CarPlayManager`, `CarPlayNavigationViewController`.
+* Added the ability to configure `routeLineLayer`, `routeCasingLineLayer`, and `routeRestrictedAreasLineLayer` in `NavigationMapView`, `NavigationViewController`, `CarPlayManager`, `CarPlayNavigationViewController`.
+* Support the ability to pass `heading` to `NavigationView`.
+* Support the ability to configure `heading` in `PreviewOptions`.
+
+### Other changes
+
+* Fixed the module name for `NavigationViewController` in the storyboard.
+* Added preserving voice instructions muted state between the navigation sessions and app launches.
+* Fixed `MapboxNavigator.routeProgress` publisher did not include alternative routes updates.
+* Fixed initial location simulation in Free Drive.
+* Creating `NavigationViewController` through `init?(coder:)` now does not create `MapboxNavigationProvider` instance. It should be provided through `NavigationOptions` using `prepareViewLoading(navigationRoutes:navigationOptions:)`
+
+## v3.1.0-beta.1
+
+### API deprecations:
+
+* `AlternativeRoutesDetectionConfig.refreshesAfterPassingDeviation`. This feature no longer has any effect.
+* `AlternativeRoutesDetectionConfig.refreshesWhenNoAvailableAlternatives`. This feature no longer has any effect other then 
+    setting the refresh interval. Use `AlternativeRoutesDetectionConfig.refreshIntervalSeconds` instead to configure the 
+    refresh interval directly.
+
+### Routing
+
+* Fixed the incorrect value in `RouteProgress.routeIsComplete` after the user drive past the destination further away.
+
+### Other changes
+
+* Updated the default alternative routes refresh interval to 5 minutes.
+
+## v3.0.2
+
+### Other changes
+
+* Fixed a memory leak issue in `NavigationViewController` that caused a crash upon arrival.
+* Fixed an issue where the `NavigationViewControllerDelegate.navigationViewController(_:didArriveAt:)` was called multiple times for a single arrival.
+
+## v3.0.1
+
+### Map
+
+* Fixed an issue where the map's zoom level would not remain fixed when zooming out using the "double touch to zoom out" gesture.
+* Added automatic switch to the dark map style when entering tunnels.
+* Fixed `NavigationMapView` DocC.
+* Fixed an issue where an incorrect route line was occasionally displayed after a rerouting.
+
+### Banners and guidance instructions
+
+* Added support for displaying road shields in the `WayNameView`.
+* Fixed a flickering road name issue when using custom road names provided through `NavigationViewControllerDelegate.navigationViewController(_:roadNameAt:)`.
+
+### Other changes
+
+* Optimized `NavigationRoutes` initialization.
+* Fixed an issue where `DayStyle` and `NightStyle` colors were not being applied to `DistanceRemainingLabel`, `FeedbackViewController`, `CarPlayCompassView`, and `ArrivalTimeLabel`.
+* Fixed a potential data race issue in the audio player.
+* Added the `NavigationViewControllerDelegate.navigationViewController(_:didArriveAt:)` method that is called when the user arrives at the destination waypoint for a route leg.
+
+## v3.0.0
+
+### Packaging
+
+* MapboxNavigation now requires [MapboxMaps v11.3.0](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.3.0).
+* MapboxNavigation now requires [MapboxCommon v24.3.1](https://github.com/mapbox/mapbox-common-ios/releases/tag/v24.3.1).
+* MapboxCoreNavigation now requires [MapboxNavigationNative v305._x_](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/305.0.0).
+
 ## v2.18.0
 
 ### Packaging
 
-* MapboxNavigation now requires [MapboxMaps v10.17.0](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v10.17.0). ([#4628](https://github.com/mapbox/mapbox-navigation-ios/pull/4628))
+* MapboxNavigation now requires [MapboxMaps v10.16.5](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v10.16.5). ([#4605](https://github.com/mapbox/mapbox-navigation-ios/pull/4605))
 * MapboxCoreNavigation now requires [MapboxDirections v2.12.0](https://github.com/mapbox/mapbox-directions-swift/releases/tag/v2.12.0). ([#4605](https://github.com/mapbox/mapbox-navigation-ios/pull/4605))
-* MapboxCoreNavigation now requires [MapboxNavigationNative v204._x_](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/202.0.0). ([#4628](https://github.com/mapbox/mapbox-navigation-ios/pull/4628))
+* MapboxCoreNavigation now requires [MapboxNavigationNative v202._x_](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/202.0.0). ([#4605](https://github.com/mapbox/mapbox-navigation-ios/pull/4605))
 * MapboxCoreNavigation is no longer dependent on MapboxMobileEvents. ([#4572](https://github.com/mapbox/mapbox-navigation-ios/pull/4572))
 * Added a Polish localization. ([#4582](https://github.com/mapbox/mapbox-navigation-ios/pull/4582))
 

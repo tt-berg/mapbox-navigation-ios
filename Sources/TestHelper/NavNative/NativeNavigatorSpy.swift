@@ -1,7 +1,7 @@
-import MapboxNavigationNative
 @_implementationOnly import MapboxCommon_Private
+@testable import MapboxNavigationCore
+import MapboxNavigationNative
 @_implementationOnly import MapboxNavigationNative_Private
-@testable import MapboxCoreNavigation
 
 public class NativeNavigatorSpy: MapboxNavigationNative.Navigator {
     public var passedTileStore: TileStore?
@@ -23,62 +23,87 @@ public class NativeNavigatorSpy: MapboxNavigationNative.Navigator {
     public var stopNavigationSessionCalled = false
 
     public init() {
-        let factory = NativeHandlersFactory(tileStorePath: "", credentials: DirectionsSpy.shared.credentials)
-        super.init(config: NativeHandlersFactory.configHandle(),
-                   cache: factory.cacheHandle,
-                   historyRecorder: nil,
-                   router: nil)
+        let factory = NativeHandlersFactory(
+            tileStorePath: "",
+            apiConfiguration: .mock(),
+            tilesVersion: "",
+            datasetProfileIdentifier: .automobile,
+            liveIncidentsOptions: nil,
+            navigatorPredictionInterval: nil,
+            utilizeSensorData: true,
+            historyDirectoryURL: nil,
+            initialManeuverAvoidanceRadius: 8,
+            locale: .current
+        )
+
+        super.init(
+            config: factory.configHandle(),
+            cache: factory.cacheHandle,
+            historyRecorder: nil
+        )
     }
-    
-    public override func createPredictiveCacheController(for options: PredictiveLocationTrackerOptions) -> PredictiveCacheController {
+
+    override public func createPredictiveCacheController(for options: PredictiveLocationTrackerOptions)
+    -> PredictiveCacheController {
         passedNavigationTrackerOptions = options
         return super.createPredictiveCacheController(for: options)
     }
 
-    public override func createPredictiveCacheController(for tileStore: TileStore,
-                                                         descriptors: [TilesetDescriptor],
-                                                         locationTrackerOptions: PredictiveLocationTrackerOptions) -> PredictiveCacheController {
+    override public func createPredictiveCacheController(
+        for tileStore: TileStore,
+        descriptors: [TilesetDescriptor],
+        locationTrackerOptions: PredictiveLocationTrackerOptions
+    )
+    -> PredictiveCacheController {
         passedTileStore = tileStore
         passedDescriptors = descriptors
         passedDescriptorsTrackerOptions = locationTrackerOptions
         return super.createPredictiveCacheController(for: locationTrackerOptions)
     }
-    
-    public override func createPredictiveCacheController(for tileStore: TileStore,
-                                                         cacheOptions: PredictiveCacheControllerOptions,
-                                                         locationTrackerOptions: PredictiveLocationTrackerOptions) -> PredictiveCacheController {
+
+    override public func createPredictiveCacheController(
+        for tileStore: TileStore,
+        cacheOptions: PredictiveCacheControllerOptions,
+        locationTrackerOptions: PredictiveLocationTrackerOptions
+    )
+    -> PredictiveCacheController {
         passedTileStore = tileStore
         passedCacheOptions = cacheOptions
         passedDatasetTrackerOptions = locationTrackerOptions
         return super.createPredictiveCacheController(for: locationTrackerOptions)
     }
 
-    public override func changeLeg(forLeg leg: UInt32, callback: @escaping ChangeLegCallback) {
+    override public func changeLeg(forLeg leg: UInt32, callback: @escaping ChangeLegCallback) {
         passedLeg = leg
         callback(returnedChangeLegResult)
     }
 
-    public override func removeRerouteObserver(for observer: RerouteObserver) {
+    override public func removeRerouteObserver(for observer: RerouteObserver) {
         passedRemovedRerouteObserver = observer
     }
 
-    @_implementationOnly public override func setRerouteControllerForController(_ controller: RerouteControllerInterface) {
+    @_implementationOnly
+    override public func setRerouteControllerForController(
+        _ controller: RerouteControllerInterface
+    ) {
         passedRerouteController = controller
     }
 
-    @_implementationOnly public override func getRerouteController() -> RerouteControllerInterface {
+    @_implementationOnly
+    override public func getRerouteController() -> RerouteControllerInterface? {
         return rerouteController ?? super.getRerouteController()
     }
 
-    @_implementationOnly public override func getRerouteDetector() -> RerouteDetectorInterface {
+    @_implementationOnly
+    override public func getRerouteDetector() -> RerouteDetectorInterface? {
         return rerouteDetector ?? RerouteDetectorSpy()
     }
 
-    public override func startNavigationSession() {
+    override public func startNavigationSession() {
         startNavigationSessionCalled = true
     }
 
-    public override func stopNavigationSession() {
+    override public func stopNavigationSession() {
         stopNavigationSessionCalled = true
     }
 }
