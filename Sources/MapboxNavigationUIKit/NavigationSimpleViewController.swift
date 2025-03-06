@@ -1,5 +1,5 @@
 import UIKit
-import MapboxCoreNavigation
+import MapboxNavigationCore
 import MapboxDirections
 import MapboxSpeech
 import AVFoundation
