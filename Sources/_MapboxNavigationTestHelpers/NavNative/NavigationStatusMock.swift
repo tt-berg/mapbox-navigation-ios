@@ -22,6 +22,7 @@ extension NavigationStatus {
         geometryIndex: UInt32 = 0,
         shapeIndex: UInt32 = 0,
         intersectionIndex: UInt32 = 0,
+        turnLanes: [TurnLane] = [],
         alternativeRouteIndices: [RouteIndices] = [],
         roads: [MapboxNavigationNative.RoadName] = [.mock()],
         voiceInstruction: VoiceInstruction? = nil,
@@ -61,6 +62,7 @@ extension NavigationStatus {
             geometryIndex: geometryIndex,
             shapeIndex: shapeIndex,
             intersectionIndex: intersectionIndex,
+            turnLanes: turnLanes,
             alternativeRouteIndices: alternativeRouteIndices,
             roads: roads,
             voiceInstruction: voiceInstruction,
@@ -101,9 +103,10 @@ extension MapMatcherOutput {
 extension MapMatch {
     public static func mock(
         position: GraphPosition = .init(edgeId: 0, percentAlong: 0),
-        proba: Float = 0
+        proba: Float = 0,
+        fetchedCandidateIndex: UInt32 = 0
     ) -> Self {
-        self.init(position: position, proba: proba)
+        self.init(position: position, proba: proba, fetchedCandidateIndex: fetchedCandidateIndex)
     }
 }
 

@@ -10,6 +10,25 @@ struct WaypointFeatureProvider {
     var customSymbolLayer: (String, String) -> SymbolLayer?
 }
 
+struct WaypointsLineStyleContent: MapStyleContent {
+    let featureIds: FeatureIds.RouteWaypoints
+
+    let source: GeoJSONSource
+
+    let circleLayer: CircleLayer?
+    let symbolLayer: SymbolLayer?
+
+    var body: some MapStyleContent {
+        source
+        if let circleLayer {
+            circleLayer
+        }
+        if let symbolLayer {
+            symbolLayer
+        }
+    }
+}
+
 @MainActor
 extension Route {
     /// Generates a map feature that visually represents waypoints along a route line.
@@ -21,8 +40,9 @@ extension Route {
         legIndex: Int,
         config: MapStyleConfig,
         featureProvider: WaypointFeatureProvider,
-        customizedLayerProvider: CustomizedLayerProvider
-    ) -> MapFeature? {
+        customizedCircleLayerProvider: CustomizedTypeLayerProvider<CircleLayer>,
+        customizedSymbolLayerProvider: CustomizedTypeLayerProvider<SymbolLayer>
+    ) -> (WaypointsLineStyleContent, MapFeature)? {
         guard let startWaypoint = legs.first?.source else { return nil }
         guard let destinationWaypoint = legs.last?.destination else { return nil }
 
@@ -30,16 +50,14 @@ extension Route {
             ? legs.dropLast().compactMap(\.destination)
             : []
         let waypoints = [startWaypoint] + intermediateWaypoints + [destinationWaypoint]
-
-        registerIntermediateWaypointImage(in: mapView)
-
         let customFeatures = featureProvider.customFeatures(waypoints, legIndex)
 
         return waypointsMapFeature(
             with: customFeatures ?? waypointsFeatures(legIndex: legIndex, waypoints: waypoints),
             config: config,
             featureProvider: featureProvider,
-            customizedLayerProvider: customizedLayerProvider
+            customizedCircleLayerProvider: customizedCircleLayerProvider,
+            customizedSymbolLayerProvider: customizedSymbolLayerProvider
         )
     }
 
@@ -49,9 +67,6 @@ extension Route {
                 var feature = Feature(geometry: .point(Point(waypoint.coordinate)))
                 var properties: [String: JSONValue] = [:]
                 properties["waypointCompleted"] = .boolean(waypointIndex <= legIndex)
-                properties["waipointIconImage"] = waypointIndex > 0 && waypointIndex < waypoints.count - 1
-                    ? .string(NavigationMapView.ImageIdentifier.midpointMarkerImage)
-                    : nil
                 feature.properties = properties
 
                 return feature
@@ -59,47 +74,48 @@ extension Route {
         )
     }
 
-    private func registerIntermediateWaypointImage(in mapView: MapView) {
-        let intermediateWaypointImageId = NavigationMapView.ImageIdentifier.midpointMarkerImage
-        mapView.mapboxMap.provisionImage(id: intermediateWaypointImageId) {
-            try $0.addImage(
-                UIImage.midpointMarkerImage,
-                id: intermediateWaypointImageId,
-                stretchX: [],
-                stretchY: []
-            )
-        }
-    }
-
     private func waypointsMapFeature(
         with features: FeatureCollection,
         config: MapStyleConfig,
         featureProvider: WaypointFeatureProvider,
-        customizedLayerProvider: CustomizedLayerProvider
-    ) -> MapFeature {
+        customizedCircleLayerProvider: CustomizedTypeLayerProvider<CircleLayer>,
+        customizedSymbolLayerProvider: CustomizedTypeLayerProvider<SymbolLayer>
+    ) -> (WaypointsLineStyleContent, MapFeature)? {
         let circleLayer = featureProvider.customCirleLayer(
             FeatureIds.RouteWaypoints.default.innerCircle,
             FeatureIds.RouteWaypoints.default.source
-        ) ?? customizedLayerProvider.customizedLayer(defaultCircleLayer(config: config))
+        ) ?? customizedCircleLayerProvider.customizedLayer(defaultCircleLayer(config: config))
 
-        let symbolLayer = featureProvider.customSymbolLayer(
+        let defaultSymbolLayer = featureProvider.customSymbolLayer(
             FeatureIds.RouteWaypoints.default.markerIcon,
             FeatureIds.RouteWaypoints.default.source
-        ) ?? customizedLayerProvider.customizedLayer(defaultSymbolLayer)
+        )
+        let symbolLayer: SymbolLayer? = if let defaultSymbolLayer {
+            customizedSymbolLayerProvider.customizedLayer(defaultSymbolLayer)
+        } else { nil }
+        let source = GeoJsonMapFeature.Source(
+            id: FeatureIds.RouteWaypoints.default.source,
+            geoJson: .featureCollection(features)
+        )
+        guard let waypointSource = source.data() else { return nil }
 
-        return GeoJsonMapFeature(
+        let content = WaypointsLineStyleContent(
+            featureIds: FeatureIds.RouteWaypoints.default,
+            source: waypointSource,
+            circleLayer: circleLayer,
+            symbolLayer: symbolLayer
+        )
+        let layers: [(any Layer)?] = [circleLayer, symbolLayer]
+
+        let mapFeature = GeoJsonMapFeature(
             id: FeatureIds.RouteWaypoints.default.featureId,
-            sources: [
-                .init(
-                    id: FeatureIds.RouteWaypoints.default.source,
-                    geoJson: .featureCollection(features)
-                ),
-            ],
+            sources: [source],
             customizeSource: { _, _ in },
-            layers: [circleLayer, symbolLayer],
+            layers: layers.compactMap { $0 },
             onBeforeAdd: { _ in },
             onAfterRemove: { _ in }
         )
+        return (content, mapFeature)
     }
 
     private func defaultCircleLayer(config: MapStyleConfig) -> CircleLayer {
@@ -127,30 +143,6 @@ extension Route {
             $0.circleStrokeWidth = .expression(.routeCasingLineWidthExpression(0.14))
             $0.circleStrokeOpacity = .expression(opacity)
             $0.circlePitchAlignment = .constant(.map)
-        }
-    }
-
-    private var defaultSymbolLayer: SymbolLayer {
-        with(
-            SymbolLayer(
-                id: FeatureIds.RouteWaypoints.default.markerIcon,
-                source: FeatureIds.RouteWaypoints.default.source
-            )
-        ) {
-            let opacity = Exp(.switchCase) {
-                Exp(.any) {
-                    Exp(.get) {
-                        "waypointCompleted"
-                    }
-                }
-                0
-                1
-            }
-            $0.iconOpacity = .expression(opacity)
-            $0.iconImage = .expression(Exp(.get) { "waipointIconImage" })
-            $0.iconAnchor = .constant(.bottom)
-            $0.iconOffset = .constant([0, 15])
-            $0.iconAllowOverlap = .constant(true)
         }
     }
 }

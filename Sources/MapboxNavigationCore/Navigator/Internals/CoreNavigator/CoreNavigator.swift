@@ -39,6 +39,8 @@ protocol CoreNavigator {
         completion: @escaping @Sendable (Result<RoutesCoordinator.RoutesResult, Error>) -> Void
     )
 
+    func unsetRoutes(uuid: UUID) async throws
+
     @MainActor
     func updateLocation(_ location: CLLocation, completion: @escaping @Sendable (Bool) -> Void)
 
@@ -294,35 +296,15 @@ final class NativeNavigator: CoreNavigator, @unchecked Sendable {
             return
         }
 
-        let refreshObserver =
-            NavigatorRouteRefreshObserver(refreshCallback: { [weak self] refreshResponse, routeId, geometryIndex in
-                return await withCheckedContinuation { continuation in
-                    self?.navigator.native.refreshRoute(
-                        forRouteRefreshResponse: refreshResponse,
-                        routeId: routeId,
-                        geometryIndex: geometryIndex
-                    ) { result in
-                        _Concurrency.Task {
-                            if result.isValue() {
-                                continuation.resume(
-                                    returning: RouteRefreshResult(
-                                        updatedRoute: result.value.route,
-                                        alternativeRoutes: result.value.alternatives
-                                    )
-                                )
-                            } else if result.isError(),
-                                      let error = result.error
-                            {
-                                Log.warning(
-                                    "Failed to apply route refresh response with error: \(error)",
-                                    category: .navigation
-                                )
-                                continuation.resume(returning: nil)
-                            }
-                        }
-                    }
-                }
-            })
+        let refreshObserver = NavigatorRouteRefreshObserver(refreshCallback: { [weak self] in
+            guard let self else { return nil }
+
+            guard let primaryRoute = navigator.native.getPrimaryRoute() else { return nil }
+            return RouteRefreshResult(
+                updatedRoute: primaryRoute,
+                alternativeRoutes: navigator.native.getAlternativeRoutes()
+            )
+        })
         navigator.native.addRouteRefreshObserver(for: refreshObserver)
         navigator.native.startRoutesRefresh(
             forDefaultRefreshPeriodMs: UInt64(refreshPeriod * 1000),
@@ -465,6 +447,20 @@ final class NativeNavigator: CoreNavigator, @unchecked Sendable {
     @MainActor
     func unsetRoutes(uuid: UUID, completion: @escaping (Result<RoutesCoordinator.RoutesResult, Error>) -> Void) {
         routeCoordinator.endActiveNavigation(with: uuid, completion: completion)
+    }
+
+    @MainActor
+    func unsetRoutes(uuid: UUID) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            routeCoordinator.endActiveNavigation(with: uuid) { result in
+                switch result {
+                case .success:
+                    continuation.resume()
+                case .failure(let failure):
+                    continuation.resume(throwing: failure)
+                }
+            }
+        }
     }
 
     @MainActor

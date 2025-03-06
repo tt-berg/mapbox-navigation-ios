@@ -26,8 +26,12 @@ private class SimulatedLocation: CLLocation, @unchecked Sendable {
 
 final class SimulatedLocationManager: NavigationLocationManager, @unchecked Sendable {
     @MainActor
-    init(initialLocation: CLLocation?) {
+    init(
+        initialLocation: CLLocation?,
+        queue: DispatchQueue = DispatchQueue(label: "com.mapbox.SimulatedLocationManager")
+    ) {
         self.simulatedLocation = initialLocation
+        self.queue = queue
 
         super.init()
 
@@ -53,7 +57,7 @@ final class SimulatedLocationManager: NavigationLocationManager, @unchecked Send
             self?.tick()
         }
         if isArmed {
-            timer.arm()
+            timer?.arm()
         }
     }
 
@@ -81,30 +85,35 @@ final class SimulatedLocationManager: NavigationLocationManager, @unchecked Send
     }
 
     override func startUpdatingLocation() {
-        timer.arm()
+        timer?.arm()
         super.startUpdatingLocation()
     }
 
     override func stopUpdatingLocation() {
-        timer.disarm()
+        timer?.disarm()
         super.stopUpdatingLocation()
     }
 
     // MARK: Simulation Logic
 
-    private var currentDistance: CLLocationDistance = 0
+    private(set) var currentDistance: CLLocationDistance = 0
     private var currentSpeed: CLLocationSpeed = 0
     private let accuracy: DispatchTimeInterval = .milliseconds(50)
     private let updateIntervalMilliseconds: Int = 1000
     private let defaultTickInterval: TimeInterval = 1
-    private var timer: DispatchTimer!
-    private var locations: [SimulatedLocation]!
-    private var remainingRouteShape: LineString!
+    private var timer: DispatchTimer?
 
-    private let queue = DispatchQueue(label: "com.mapbox.SimulatedLocationManager")
+    // These properties should be accessed from the queue.
+    private var locations: [SimulatedLocation] = []
+    var remainingRouteShape: LineString?
 
-    private(set) var route: Route?
-    private var routeProgress: RouteProgress?
+    // These properties should be access from the main thread.
+    private(set) var routeProgress: RouteProgress?
+    private var originalRouteShape: LineString? {
+        routeProgress?.route.shape
+    }
+
+    private let queue: DispatchQueue
 
     private var _nextDate: Date?
     private func getNextDate() -> Date {
@@ -118,23 +127,25 @@ final class SimulatedLocationManager: NavigationLocationManager, @unchecked Send
 
     private var slicedIndex: Int?
 
-    private func update(route: Route?) {
+    private func update(with routeProgress: RouteProgress?) {
         // NOTE: this method is expected to be called on the main thread, onMainQueueSync is used as extra check
         onMainAsync { [weak self] in
-            self?.route = route
-            if let shape = route?.shape {
-                self?.queue.async { [shape, weak self] in
-                    self?.reset(with: shape)
-                }
-            }
+            guard let self else { return }
+
+            self.routeProgress = routeProgress
+            reset(with: routeProgress?.route.shape)
         }
     }
 
     private func reset(with shape: LineString?) {
         guard let shape else { return }
 
-        remainingRouteShape = shape
-        locations = shape.coordinates.simulatedLocationsWithTurnPenalties()
+        queue.async { [weak self] in
+            guard let self else { return }
+
+            remainingRouteShape = shape
+            locations = shape.coordinates.simulatedLocationsWithTurnPenalties()
+        }
     }
 
     func tick() {
@@ -144,14 +155,14 @@ final class SimulatedLocationManager: NavigationLocationManager, @unchecked Send
         ) = onMainQueueSync {
             (
                 routeProgress?.currentLeg.expectedSegmentTravelTimes,
-                route?.shape
+                originalRouteShape
             )
         }
 
         let tickDistance = currentSpeed * defaultTickInterval
         guard let remainingShape = remainingRouteShape,
               let originalShape,
-              let indexedNewCoordinate = remainingShape.indexedCoordinateFromStart(distance: tickDistance)
+              let slicingMetaData = remainingShape.slicingMetadata(at: tickDistance)
         else {
             // report last known coordinate or real one
             if let simulatedLocation {
@@ -195,7 +206,7 @@ final class SimulatedLocationManager: NavigationLocationManager, @unchecked Send
             return
         }
 
-        let newCoordinate = indexedNewCoordinate.coordinate
+        let newCoordinate = slicingMetaData.coordinate
         // Closest coordinate ahead
         guard let lookAheadCoordinate = remainingShape.coordinateFromStart(distance: tickDistance + 10) else { return }
         guard let closestCoordinateOnRouteIndex = slicedIndex.map({ idx -> Int? in
@@ -208,13 +219,13 @@ final class SimulatedLocationManager: NavigationLocationManager, @unchecked Send
         // Simulate speed based on expected segment travel time
         if let expectedSegmentTravelTimes,
            let nextCoordinateOnRoute = originalShape.coordinates.after(index: closestCoordinateOnRouteIndex),
-           let time = expectedSegmentTravelTimes.optional[closestCoordinateOnRouteIndex]
+           let time = expectedSegmentTravelTimes.optional[closestCoordinateOnRouteIndex],
+           time > 0
         {
             let distance = originalShape.coordinates[closestCoordinateOnRouteIndex].distance(to: nextCoordinateOnRoute)
             currentSpeed = min(max(distance / time, minimumSpeed), maximumSpeed)
             slicedIndex = max(closestCoordinateOnRouteIndex - 1, 0)
-        } else {
-            let closestLocation = locations[closestCoordinateOnRouteIndex]
+        } else if let closestLocation = locations.optional[closestCoordinateOnRouteIndex] {
             let distanceToClosest = closestLocation.distance(from: CLLocation(newCoordinate))
             let distance = min(max(distanceToClosest, 10), safeDistance)
             let coordinatesNearby = remainingShape.trimmed(from: newCoordinate, distance: 100)!.coordinates
@@ -244,7 +255,7 @@ final class SimulatedLocationManager: NavigationLocationManager, @unchecked Send
             )
         }
         currentDistance += remainingShape.distance(to: newCoordinate) ?? 0
-        remainingRouteShape = remainingShape.sliced(from: newCoordinate)
+        remainingRouteShape = slicingMetaData.trailingLineString
     }
 
     func progressDidChange(_ progress: RouteProgress?) {
@@ -252,32 +263,36 @@ final class SimulatedLocationManager: NavigationLocationManager, @unchecked Send
             cleanUp()
             return
         }
-        onMainQueueSync {
-            self.routeProgress = progress
-            if progress.route.distance != self.route?.distance {
-                update(route: progress.route)
+        onMainQueueSync { [weak self] in
+            guard let self else { return }
+
+            if progress.route.distance != routeProgress?.route.distance {
+                // This can happen when an alternative route was selected.
+                didReroute(progress: progress)
             }
         }
     }
 
     func cleanUp() {
-        route = nil
-        routeProgress = nil
-        remainingRouteShape = nil
-        locations = []
+        onMainQueueSync { [weak self] in
+            self?.routeProgress = nil
+        }
+        queue.async { [weak self] in
+            self?.remainingRouteShape = nil
+            self?.locations = []
+        }
     }
 
     func didReroute(progress: RouteProgress?) {
         guard let progress else { return }
 
-        update(route: progress.route)
+        update(with: progress)
 
         let shape = progress.route.shape
         let currentSpeed = currentSpeed
 
         queue.async { [weak self] in
-            guard let self,
-                  let routeProgress else { return }
+            guard let self else { return }
 
             var newClosestCoordinate: LocationCoordinate2D!
             if let location,
@@ -288,16 +303,19 @@ final class SimulatedLocationManager: NavigationLocationManager, @unchecked Send
                 currentDistance = closestCoordinate.distance
                 newClosestCoordinate = closestCoordinate.coordinate
             } else {
-                currentDistance = calculateCurrentDistance(routeProgress.distanceTraveled, speed: currentSpeed)
+                currentDistance = calculateCurrentDistance(progress.distanceTraveled, speed: currentSpeed)
                 newClosestCoordinate = shape?.coordinateFromStart(distance: currentDistance)
             }
 
-            onMainQueueSync {
-                self.routeProgress = progress
-                self.route = progress.route
+            onMainAsync { [weak self] in
+                guard let self else { return }
+
+                routeProgress = progress
             }
-            reset(with: shape)
-            remainingRouteShape = remainingRouteShape.sliced(from: newClosestCoordinate)
+            guard let shape else { return }
+
+            remainingRouteShape = shape.sliced(from: newClosestCoordinate)
+            locations = shape.coordinates.simulatedLocationsWithTurnPenalties()
             slicedIndex = nil
         }
     }
@@ -375,8 +393,9 @@ extension Array where Element: Equatable {
 extension [CLLocationCoordinate2D] {
     // Calculate turn penalty for each coordinate.
     fileprivate func simulatedLocationsWithTurnPenalties() -> [SimulatedLocation] {
-        var locations = [SimulatedLocation]()
+        guard !isEmpty else { return [] }
 
+        var locations = [SimulatedLocation]()
         for (coordinate, nextCoordinate) in zip(prefix(upTo: endIndex - 1), suffix(from: 1)) {
             let currentCoordinate = locations.isEmpty ? first! : coordinate
             let course = coordinate.direction(to: nextCoordinate).wrap(min: 0, max: 360)
@@ -391,7 +410,7 @@ extension [CLLocationCoordinate2D] {
                 speed: minimumSpeed,
                 timestamp: Date()
             )
-            location.turnPenalty = Swift.max(Swift.min(turnPenalty, maximumTurnPenalty), minimumTurnPenalty)
+            location.turnPenalty = turnPenalty.wrap(min: minimumTurnPenalty, max: maximumTurnPenalty)
             locations.append(location)
         }
 
@@ -400,7 +419,7 @@ extension [CLLocationCoordinate2D] {
             altitude: 0,
             horizontalAccuracy: horizontalAccuracy,
             verticalAccuracy: verticalAccuracy,
-            course: locations.last!.course,
+            course: locations.last?.course ?? 0,
             speed: minimumSpeed,
             timestamp: Date()
         ))

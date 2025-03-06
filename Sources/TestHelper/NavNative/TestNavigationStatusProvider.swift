@@ -65,6 +65,7 @@ public enum TestNavigationStatusProvider {
         geometryIndex: UInt32 = 0,
         shapeIndex: UInt32 = 0,
         intersectionIndex: UInt32 = 0,
+        turnLanes: [TurnLane] = [],
         roads: [MapboxNavigationNative.RoadName]? = nil,
         voiceInstruction: VoiceInstruction? = nil,
         bannerInstruction: BannerInstruction? = nil,
@@ -81,7 +82,7 @@ public enum TestNavigationStatusProvider {
             shield: shield
         )
         let roadNames = roads ?? [road]
-        let mapMatch = MapMatch(position: .init(edgeId: 0, percentAlong: 0), proba: 42)
+        let mapMatch = MapMatch(position: .init(edgeId: 0, percentAlong: 0), proba: 42, fetchedCandidateIndex: 0)
         let mapMatcherOutput = MapMatcherOutput(matches: [mapMatch], isTeleport: false, totalCandidatesCount: 1)
         return .init(
             routeState: routeState,
@@ -100,6 +101,7 @@ public enum TestNavigationStatusProvider {
             geometryIndex: geometryIndex,
             shapeIndex: shapeIndex,
             intersectionIndex: intersectionIndex,
+            turnLanes: turnLanes,
             alternativeRouteIndices: [],
             roads: roadNames,
             voiceInstruction: voiceInstruction,

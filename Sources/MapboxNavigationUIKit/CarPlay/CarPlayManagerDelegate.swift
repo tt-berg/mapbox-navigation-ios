@@ -26,6 +26,31 @@ public protocol CarPlayManagerDelegate: AnyObject, UnimplementedLogging {
     func carPlayManager(
         _ carPlayManager: CarPlayManager,
         leadingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
+        in carPlayTemplate: CPMapTemplate,
+        for activity: CarPlayActivity
+    ) -> [CPBarButton]?
+
+    /// Offers the delegate an opportunity to provide a customized list of leading bar buttons at the root of the
+    /// template stack for the given activity.
+    ///
+    /// These buttons' tap handlers encapsulate the action to be taken, so it is up to the developer to ensure the
+    /// hierarchy of templates is adequately navigable.
+    /// - Parameters:
+    ///   - carPlayManager: The ``CarPlayManager`` instance.
+    ///   - traitCollection: The trait collection of the view controller being shown in the CarPlay window.
+    ///   - carPlayTemplate: The template into which the returned bar buttons will be inserted.
+    ///   - activity: What the user is currently doing on the CarPlay screen. Use this parameter to distinguish between
+    /// multiple templates of the same kind, such as multiple `CPMapTemplate`s.
+    /// - Returns: An array of bar buttons to display on the leading side of the navigation bar while `template` is
+    /// visible.
+    @available(
+        *,
+        deprecated,
+        message: "Use carPlayManager(_:leadingNavigationBarButtonsCompatibleWith:in:for:) instead."
+    )
+    func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        leadingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
         in carPlayTemplate: CPTemplate,
         for activity: CarPlayActivity
     ) -> [CPBarButton]?
@@ -43,6 +68,31 @@ public protocol CarPlayManagerDelegate: AnyObject, UnimplementedLogging {
     /// multiple templates of the same kind, such as multiple `CPMapTemplate`s.
     /// - Returns: An array of bar buttons to display on the trailing side of the navigation bar while `template` is
     /// visible.
+    func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        trailingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
+        in carPlayTemplate: CPMapTemplate,
+        for activity: CarPlayActivity
+    ) -> [CPBarButton]?
+
+    /// Offers the delegate an opportunity to provide a customized list of trailing bar buttons at the root of the
+    /// template stack for the given activity.
+    ///
+    /// These buttons' tap handlers encapsulate the action to be taken, so it is up to the developer to ensure the
+    /// hierarchy of templates is adequately navigable.
+    /// - Parameters:
+    ///   - carPlayManager: The ``CarPlayManager`` instance.
+    ///   - traitCollection: The trait collection of the view controller being shown in the CarPlay window.
+    ///   - carPlayTemplate: The template into which the returned bar buttons will be inserted.
+    ///   - activity: What the user is currently doing on the CarPlay screen. Use this parameter to distinguish between
+    /// multiple templates of the same kind, such as multiple `CPMapTemplate`s.
+    /// - Returns: An array of bar buttons to display on the trailing side of the navigation bar while `template` is
+    /// visible.
+    @available(
+        *,
+        deprecated,
+        message: "Use carPlayManager(_:trailingNavigationBarButtonsCompatibleWith:in:for:) instead."
+    )
     func carPlayManager(
         _ carPlayManager: CarPlayManager,
         trailingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
@@ -233,6 +283,11 @@ public protocol CarPlayManagerDelegate: AnyObject, UnimplementedLogging {
     ///   - parentViewController: The view controller that contains the map view, which is an instance of either
     /// ``CarPlayMapViewController`` or ``CarPlayNavigationViewController``.
     ///   - pointAnnotationManager: The object that manages the point annotation in the map view.
+    @available(
+        *,
+        deprecated,
+        message: "This method is deprecated and should no longer be used, as the final destination annotation is no longer added to the map. Use the corresponding delegate methods to customize waypoints appearance."
+    )
     func carPlayManager(
         _ carPlayManager: CarPlayManager,
         didAdd finalDestinationAnnotation: PointAnnotation,
@@ -240,46 +295,135 @@ public protocol CarPlayManagerDelegate: AnyObject, UnimplementedLogging {
         pointAnnotationManager: PointAnnotationManager
     )
 
-    /// Returns a `FeatureCollection` that represents intermediate waypoints along the route (that is, excluding the
-    /// origin).
-    /// If this method is unimplemented, the navigation view controller's map view draws the waypoints using default
-    /// `FeatureCollection`.
+    // MARK: Customizing Waypoint(s) Appearance
+
+    /// Asks the receiver to return a `CircleLayer` for waypoints, given an identifier and source.
+    /// The returned layer is added to the map below the layer returned by
+    /// ``CarPlayManagerDelegate/carPlayManager(_:waypointSymbolLayerWithIdentifier:sourceIdentifier:)``.
+    /// This method is invoked any time waypoints are added or shown.
     /// - Parameters:
     ///   - carPlayManager: The ``CarPlayManager`` object.
-    ///   - waypoints: The intermediate waypoints to be displayed on the map.
-    ///   - legIndex: The index of the current leg during navigation.
-    /// - Returns: A `FeatureCollection` that represents intermediate waypoints along the route (that is, excluding the
-    /// origin).
+    ///   - identifier: The `CircleLayer` identifier.
+    ///   - sourceIdentifier: Identifier of the source, which contains the waypoint data that this method would style.
+    /// - Returns: A `CircleLayer` that the map applies to all waypoints.
     func carPlayManager(
         _ carPlayManager: CarPlayManager,
-        shapeFor waypoints: [Waypoint],
-        legIndex: Int
-    ) -> FeatureCollection?
+        waypointCircleLayerWithIdentifier identifier: String,
+        sourceIdentifier: String
+    ) -> CircleLayer?
 
-    ///  Asks the receiver to return a `SymbolLayer` for waypoint symbols, given an identifier and source.
+    /// Asks the receiver to return a `SymbolLayer` for waypoint symbols, given an identifier and source.
+    /// The returned layer is added to the map above the layer returned by
+    /// ``CarPlayManagerDelegate/carPlayManager(_:waypointCircleLayerWithIdentifier:sourceIdentifier:)``.
+    /// This method is invoked any time waypoints are added or shown.
     /// - Parameters:
     ///   - carPlayManager: The ``CarPlayManager`` object.
     ///   - identifier: The `SymbolLayer` identifier.
     ///   - sourceIdentifier:  Identifier of the source, which contains the waypoint data that this method would style.
-    /// - Returns: A `SymbolLayer` that the map applies to all intermediate waypoint symbols.
+    /// - Returns: A `SymbolLayer` that the map applies to all waypoint symbols.
     func carPlayManager(
         _ carPlayManager: CarPlayManager,
         waypointSymbolLayerWithIdentifier identifier: String,
         sourceIdentifier: String
     ) -> SymbolLayer?
 
-    //  Asks the receiver to return a `CircleLayer` for waypoints, given an identifier and source. This method is
-    //  invoked any time waypoints are added or shown.
+    /// Asks the receiver to return a `FeatureCollection` that describes the geometry of waypoints.
+    ///
+    /// For example, to customize the appearance of intermediate waypoints by adding an image follow these steps:
+    ///
+    /// 1. Implement the ``CarPlayManagerDelegate/carPlayManager(_:shapeFor:legIndex:)``
+    /// method to provide a
+    /// `FeatureCollection` for waypoints.
+    /// Within this method:
+    ///     1. Add an image to the map by calling `MapboxMap.addImage(_:id:stretchX:stretchY:)` method.
+    ///     2. Iterate through the `waypoints` array and create `Feature` for each waypoint.
+    ///     3. Add a key-value pair to `Feature.properties` for specifying an icon image if the waypoint is
+    ///     intermediate.
+    ///
+    /// Example:
+    ///
+    /// ```swift
+    /// func carPlayManager(
+    ///     _ carPlayManager: CarPlayManager,
+    ///     shapeFor waypoints: [Waypoint],
+    ///     legIndex: Int
+    /// ) -> FeatureCollection? {
+    ///     guard let navigationMapView = carPlayManager.navigationMapView else { return nil }
+    ///
+    ///     let imageId = "intermediateWaypointImageId"
+    ///     if !navigationMapView.mapView.mapboxMap.imageExists(withId: imageId) {
+    ///         do {
+    ///             try navigationMapView.mapView.mapboxMap.addImage(
+    ///                 UIImage(named: "waypoint")!,
+    ///                 id: imageId,
+    ///                 stretchX: [],
+    ///                 stretchY: []
+    ///             )
+    ///         } catch {
+    ///             // Handle the error
+    ///             return nil
+    ///         }
+    ///     }
+    ///     return FeatureCollection(
+    ///         features: waypoints.enumerated().map { waypointIndex, waypoint in
+    ///             var feature = Feature(geometry: .point(Point(waypoint.coordinate)))
+    ///             var properties: [String: JSONValue] = [:]
+    ///             properties["waypointCompleted"] = .boolean(waypointIndex <= legIndex)
+    ///             properties["waypointIconImage"] = waypointIndex > 0 && waypointIndex < waypoints.count - 1
+    ///             ? .string(imageId)
+    ///             : nil
+    ///             feature.properties = properties
+    ///             return feature
+    ///         }
+    ///     )
+    /// }
+    /// ```
+    ///
+    /// 2. Implement the
+    /// ``CarPlayManagerDelegate/carPlayManager(_:waypointSymbolLayerWithIdentifier:sourceIdentifier:)``
+    /// method to provide a custom `SymbolLayer`.
+    ///     1. Create a `SymbolLayer`.
+    ///     2. Set `SymbolLayer.iconImage` to an expression `Exp` to retrieve the icon image name based on the
+    ///     properties defined in step 1.3.
+    ///
+    /// Example:
+    /// ```swift
+    /// func carPlayManager(
+    ///     _ carPlayManager: CarPlayManager,
+    ///     waypointSymbolLayerWithIdentifier identifier: String,
+    ///     sourceIdentifier: String
+    /// ) -> SymbolLayer? {
+    ///
+    ///     var symbolLayer = SymbolLayer(id: identifier, source: sourceIdentifier)
+    ///     let opacity = Exp(.switchCase) {
+    ///         Exp(.any) {
+    ///             Exp(.get) {
+    ///                 "waypointCompleted"
+    ///             }
+    ///         }
+    ///         0
+    ///         1
+    ///     }
+    ///     symbolLayer.iconOpacity = .expression(opacity)
+    ///     symbolLayer.iconImage = .expression(Exp(.get) { "waypointIconImage" })
+    ///     symbolLayer.iconAnchor = .constant(.bottom)
+    ///     symbolLayer.iconOffset = .constant([0, 15])
+    ///     symbolLayer.iconAllowOverlap = .constant(true)
+    ///     return symbolLayer
+    /// }
+    /// ```
+    ///
     /// - Parameters:
     ///   - carPlayManager: The ``CarPlayManager`` object.
-    ///   - identifier: The `CircleLayer` identifier.
-    ///   - sourceIdentifier: Identifier of the source, which contains the waypoint data that this method would style.
-    /// - Returns: A `CircleLayer` that the map applies to all intermediate waypoints.
+    ///   - waypoints: The waypoints to be displayed on the map.
+    ///   - legIndex: The index of the current leg during navigation.
+    /// - Returns: Optionally, a `FeatureCollection` that defines the shape of the waypoint, or `nil` to use the default
+    /// behavior.
     func carPlayManager(
         _ carPlayManager: CarPlayManager,
-        waypointCircleLayerWithIdentifier identifier: String,
-        sourceIdentifier: String
-    ) -> CircleLayer?
+        shapeFor waypoints: [Waypoint],
+        legIndex: Int
+    ) -> FeatureCollection?
 
     // MARK: Transitioning Between Templates
 
@@ -499,6 +643,21 @@ public protocol CarPlayManagerDelegate: AnyObject, UnimplementedLogging {
         _ carPlayManager: CarPlayManager,
         guidanceBackgroundColorFor style: UIUserInterfaceStyle
     ) -> UIColor?
+
+    @_spi(MapboxInternal)
+    func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        didSetup navigationMapView: NavigationMapView
+    )
+
+    @_spi(MapboxInternal)
+    func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        leadingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
+        in carPlayTemplate: CPMapTemplate,
+        for activity: CarPlayActivity,
+        cameraState: NavigationCameraState
+    ) -> [CPBarButton]?
 }
 
 extension CarPlayManagerDelegate {
@@ -516,8 +675,30 @@ extension CarPlayManagerDelegate {
     /// `UnimplementedLogging` prints a warning to standard output the first time this method is called.
     public func carPlayManager(
         _ carPlayManager: CarPlayManager,
+        leadingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
+        in carPlayTemplate: CPMapTemplate,
+        for activity: CarPlayActivity
+    ) -> [CPBarButton]? {
+        logUnimplemented(protocolType: CarPlayManagerDelegate.self, level: .info)
+        return nil
+    }
+
+    /// `UnimplementedLogging` prints a warning to standard output the first time this method is called.
+    public func carPlayManager(
+        _ carPlayManager: CarPlayManager,
         trailingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
         in carPlayTemplate: CPTemplate,
+        for activity: CarPlayActivity
+    ) -> [CPBarButton]? {
+        logUnimplemented(protocolType: CarPlayManagerDelegate.self, level: .info)
+        return nil
+    }
+
+    /// `UnimplementedLogging` prints a warning to standard output the first time this method is called.
+    public func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        trailingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
+        in carPlayTemplate: CPMapTemplate,
         for activity: CarPlayActivity
     ) -> [CPBarButton]? {
         logUnimplemented(protocolType: CarPlayManagerDelegate.self, level: .info)
@@ -840,6 +1021,26 @@ extension CarPlayManagerDelegate {
         _ carPlayManager: CarPlayManager,
         guidanceBackgroundColorFor style: UIUserInterfaceStyle
     ) -> UIColor? {
+        logUnimplemented(protocolType: CarPlayManagerDelegate.self, level: .debug)
+        return nil
+    }
+
+    @_spi(MapboxInternal)
+    public func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        didSetup navigationMapView: NavigationMapView
+    ) {
+        logUnimplemented(protocolType: CarPlayManagerDelegate.self, level: .debug)
+    }
+
+    @_spi(MapboxInternal)
+    public func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        leadingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
+        in carPlayTemplate: CPMapTemplate,
+        for activity: CarPlayActivity,
+        cameraState: NavigationCameraState
+    ) -> [CPBarButton]? {
         logUnimplemented(protocolType: CarPlayManagerDelegate.self, level: .debug)
         return nil
     }

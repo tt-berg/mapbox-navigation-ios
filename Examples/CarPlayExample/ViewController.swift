@@ -59,7 +59,7 @@ class ViewController: UIViewController {
     var routes: NavigationRoutes? {
         didSet {
             guard let routes else {
-                clearNavigationMapView(endNavigation: false)
+                clearNavigationMapView(endNavigation: true)
                 return ()
             }
             waypoints = routes.mainRoute.route.legs.compactMap { $0.destination }
@@ -77,7 +77,9 @@ class ViewController: UIViewController {
         startButton.isEnabled = true
         clearMap.isHidden = false
 
-        updateCarPlayRoutesPreview()
+        Task {
+            await updateCarPlayRoutesPreview()
+        }
     }
 
     weak var activeNavigationViewController: NavigationViewController?
@@ -238,7 +240,7 @@ class ViewController: UIViewController {
             waypoints.removeAll()
             navigationMapView?.navigationCamera.update(cameraState: .following)
             if !endNavigation {
-                updateCarPlayRoutesPreview()
+                await updateCarPlayRoutesPreview()
             }
 
             core.tripSession().startFreeDrive()
@@ -248,14 +250,12 @@ class ViewController: UIViewController {
         }
     }
 
-    private func updateCarPlayRoutesPreview() {
+    private func updateCarPlayRoutesPreview() async {
         guard let delegate = UIApplication.shared.delegate as? AppDelegate else { return }
-        Task {
-            if let routes {
-                await delegate.carPlayManager.previewRoutes(for: routes)
-            } else {
-                await delegate.carPlayManager.cancelRoutesPreview()
-            }
+        if let routes {
+            await delegate.carPlayManager.previewRoutes(for: routes)
+        } else {
+            await delegate.carPlayManager.cancelRoutesPreview()
         }
     }
 
@@ -568,33 +568,43 @@ class ViewController: UIViewController {
         asyncRequestRoute(with: [userWaypoint] + waypoints)
     }
 
+    private var routeLoadingTask: Task<NavigationRoutes, Error>?
+
     func asyncRequestRoute(with waypoints: [Waypoint]) {
-        Task {
-            let provider = core.routingProvider()
+        let provider = core.routingProvider()
+        routeLoadingTask?.cancel()
+
+        if requestMapMatching {
+            let optionWaypoints = waypoints.map {
+                var waypoint = $0
+                waypoint.heading = nil
+                return waypoint
+            }
+            let mapMatchingOptions = NavigationMatchOptions(
+                waypoints: optionWaypoints,
+                profileIdentifier: profileIdentifier
+            )
+            routeLoadingTask = provider.calculateRoutes(options: mapMatchingOptions)
+        } else {
+            let routeOptions = NavigationRouteOptions(
+                waypoints: waypoints,
+                profileIdentifier: profileIdentifier
+            )
+            routeLoadingTask = provider.calculateRoutes(options: routeOptions)
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
             do {
-                if requestMapMatching {
-                    let optionWaypoints = waypoints.map {
-                        var waypoint = $0
-                        waypoint.heading = nil
-                        return waypoint
-                    }
-                    let mapMatchingOptions = NavigationMatchOptions(
-                        waypoints: optionWaypoints,
-                        profileIdentifier: profileIdentifier
-                    )
-                    let navigationRoutes = try await provider.calculateRoutes(options: mapMatchingOptions).value
-                    routes = navigationRoutes
-                } else {
-                    let routeOptions = NavigationRouteOptions(
-                        waypoints: waypoints,
-                        profileIdentifier: profileIdentifier
-                    )
-                    let navigationRoutes = try await provider.calculateRoutes(options: routeOptions).value
-                    routes = navigationRoutes
-                }
+                routes = try await routeLoadingTask?.value
             } catch {
-                routes = nil
-                presentAlert(message: error.localizedDescription)
+                switch error {
+                case is CancellationError:
+                    print("Route request was cancelled")
+                default:
+                    routes = nil
+                    presentAlert(message: error.localizedDescription)
+                }
             }
         }
     }

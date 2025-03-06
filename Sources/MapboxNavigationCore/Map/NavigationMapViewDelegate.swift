@@ -55,7 +55,7 @@ public protocol NavigationMapViewDelegate: AnyObject, UnimplementedLogging {
     @available(
         *,
         deprecated,
-        message: "This method is deprecated and should no longer be used, as the final destination annotation is no longer added to the map."
+        message: "This method is deprecated and should no longer be used, as the final destination annotation is no longer added to the map. Use the corresponding delegate methods to customize waypoints appearance."
     )
     func navigationMapView(
         _ navigationMapView: NavigationMapView,
@@ -63,7 +63,7 @@ public protocol NavigationMapViewDelegate: AnyObject, UnimplementedLogging {
         pointAnnotationManager: PointAnnotationManager
     )
 
-    /// Tells the reciever that ``NavigationMapView`` has updated the displayed ``NavigationRoutes`` for the active
+    /// Tells the receiver that ``NavigationMapView`` has updated the displayed ``NavigationRoutes`` for the active
     /// guidance.
     /// - Parameters:
     ///   - navigationMapView: The ``NavigationMapView`` object.
@@ -73,9 +73,11 @@ public protocol NavigationMapViewDelegate: AnyObject, UnimplementedLogging {
         didAddRedrawActiveGuidanceRoutes navigationRoutes: NavigationRoutes
     )
 
-    // MARK: Supplying Waypoint(s) Data
+    // MARK: Customizing Waypoint(s) Appearance
 
     /// Asks the receiver to return a `CircleLayer` for waypoints, given an identifier and source.
+    ///  The returned layer is added to the map below the layer returned by
+    /// ``NavigationMapViewDelegate/navigationMapView(_:waypointSymbolLayerWithIdentifier:sourceIdentifier:)-792zf``.
     /// This method is invoked any time waypoints are added or shown.
     /// - Parameters:
     ///   - navigationMapView: The ``NavigationMapView`` object.
@@ -88,8 +90,10 @@ public protocol NavigationMapViewDelegate: AnyObject, UnimplementedLogging {
         sourceIdentifier: String
     ) -> CircleLayer?
 
-    /// Asks the receiver to return a `SymbolLayer` for intermediate waypoint symbols, given an identifier and source.
-    /// This method is invoked any time intermediate waypoints are added or shown.
+    /// Asks the receiver to return a `SymbolLayer` for waypoint symbols, given an identifier and source.
+    /// The returned layer is added to the map above the layer returned by
+    /// ``NavigationMapViewDelegate/navigationMapView(_:waypointCircleLayerWithIdentifier:sourceIdentifier:)-8a2bi``.
+    /// This method is invoked any time waypoints are added or shown.
     /// - Parameters:
     ///   - navigationMapView: The ``NavigationMapView`` object.
     ///   - identifier: The `SymbolLayer` identifier.
@@ -102,11 +106,94 @@ public protocol NavigationMapViewDelegate: AnyObject, UnimplementedLogging {
     ) -> SymbolLayer?
 
     /// Asks the receiver to return a `FeatureCollection` that describes the geometry of waypoints.
+    ///
+    /// For example, to customize the appearance of intermediate waypoints by adding an image follow these steps:
+    ///
+    /// 1. Implement the ``NavigationMapViewDelegate/navigationMapView(_:shapeFor:legIndex:)-4osii`` method to provide a
+    /// `FeatureCollection` for waypoints.
+    /// Within this method:
+    ///     1. Add an image to the map by calling `MapboxMap.addImage(_:id:stretchX:stretchY:)` method.
+    ///     2. Iterate through the `waypoints` array and create `Feature` for each waypoint.
+    ///     3. Add a key-value pair to `Feature.properties` for specifying an icon image if the waypoint is
+    ///     intermediate.
+    ///
+    /// Example:
+    ///
+    /// ```swift
+    /// func navigationMapView(
+    ///     _ navigationMapView: NavigationMapView,
+    ///     shapeFor waypoints: [Waypoint],
+    ///     legIndex: Int
+    /// ) -> FeatureCollection? {
+    ///
+    ///     let imageId = "intermediateWaypointImageId"
+    ///     if !navigationMapView.mapView.mapboxMap.imageExists(withId: imageId) {
+    ///         do {
+    ///             try navigationMapView.mapView.mapboxMap.addImage(
+    ///                 UIImage(named: "waypoint")!,
+    ///                 id: imageId,
+    ///                 stretchX: [],
+    ///                 stretchY: []
+    ///             )
+    ///         } catch {
+    ///             // Handle the error
+    ///             return nil
+    ///         }
+    ///     }
+    ///     return FeatureCollection(
+    ///         features: waypoints.enumerated().map { waypointIndex, waypoint in
+    ///             var feature = Feature(geometry: .point(Point(waypoint.coordinate)))
+    ///             var properties: [String: JSONValue] = [:]
+    ///             properties["waypointCompleted"] = .boolean(waypointIndex <= legIndex)
+    ///             properties["waypointIconImage"] = waypointIndex > 0 && waypointIndex < waypoints.count - 1
+    ///             ? .string(imageId)
+    ///             : nil
+    ///             feature.properties = properties
+    ///             return feature
+    ///         }
+    ///     )
+    /// }
+    /// ```
+    ///
+    /// 2. Implement the
+    /// ``NavigationMapViewDelegate/navigationMapView(_:waypointSymbolLayerWithIdentifier:sourceIdentifier:)-4e9yh``
+    /// method to provide a custom `SymbolLayer`.
+    ///     1. Create a `SymbolLayer`.
+    ///     2. Set `SymbolLayer.iconImage` to an expression `Exp` to retrieve the icon image name based on the
+    ///     properties defined in step 1.3.
+    ///
+    /// Example:
+    /// ```swift
+    /// func navigationMapView(
+    ///     _ navigationMapView: NavigationMapView,
+    ///     waypointSymbolLayerWithIdentifier identifier: String,
+    ///     sourceIdentifier: String
+    /// ) -> SymbolLayer? {
+    ///
+    ///     var symbolLayer = SymbolLayer(id: identifier, source: sourceIdentifier)
+    ///     let opacity = Exp(.switchCase) {
+    ///         Exp(.any) {
+    ///             Exp(.get) {
+    ///                 "waypointCompleted"
+    ///             }
+    ///         }
+    ///         0
+    ///         1
+    ///     }
+    ///     symbolLayer.iconOpacity = .expression(opacity)
+    ///     symbolLayer.iconImage = .expression(Exp(.get) { "waypointIconImage" })
+    ///     symbolLayer.iconAnchor = .constant(.bottom)
+    ///     symbolLayer.iconOffset = .constant([0, 15])
+    ///     symbolLayer.iconAllowOverlap = .constant(true)
+    ///     return symbolLayer
+    /// }
+    /// ```
+    ///
     /// - Parameters:
     ///   - navigationMapView: The ``NavigationMapView`` object.
     ///   - waypoints: The waypoints to be displayed on the map.
     ///   - legIndex: The index of the current leg during navigation.
-    /// - Returns: Optionally, a `FeatureCollection` that defines the shape of the waypoint, or `nil` to use default
+    /// - Returns: Optionally, a `FeatureCollection` that defines the shape of the waypoint, or `nil` to use the default
     /// behavior.
     func navigationMapView(_ navigationMapView: NavigationMapView, shapeFor waypoints: [Waypoint], legIndex: Int)
         -> FeatureCollection?

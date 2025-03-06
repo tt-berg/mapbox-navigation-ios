@@ -46,8 +46,9 @@ open class CarPlayMapViewController: UIViewController {
         }
     }
 
+    /// The map view showing the route and the user’s location.
     @MainActor
-    var navigationMapView: NavigationMapView {
+    public var navigationMapView: NavigationMapView {
         return view as! NavigationMapView
     }
 
@@ -76,7 +77,7 @@ open class CarPlayMapViewController: UIViewController {
     }()
 
     /// The map button for zooming in the current map view.
-    public lazy var zoomInButton: CPMapButton = {
+    public var zoomInButton: CPMapButton {
         let zoomInButton = CPMapButton { [weak self] _ in
             guard let self else { return }
 
@@ -89,13 +90,23 @@ open class CarPlayMapViewController: UIViewController {
         }
 
         let bundle = Bundle.mapboxNavigation
-        zoomInButton.image = UIImage(named: "carplay_plus", in: bundle, compatibleWith: traitCollection)
+
+        let imageName = switch traitCollection.userInterfaceStyle {
+        case .light:
+            "carplay_plus_light"
+        case .dark, .unspecified:
+            "carplay_plus_dark"
+        @unknown default:
+            "carplay_plus_dark"
+        }
+
+        zoomInButton.image = UIImage(named: imageName, in: bundle, compatibleWith: traitCollection)
 
         return zoomInButton
-    }()
+    }
 
     /// The map button for zooming out the current map view.
-    public lazy var zoomOutButton: CPMapButton = {
+    public var zoomOutButton: CPMapButton {
         let zoomOutButton = CPMapButton { [weak self] _ in
             guard let self else { return }
             let mapView = navigationMapView.mapView
@@ -107,10 +118,18 @@ open class CarPlayMapViewController: UIViewController {
         }
 
         let bundle = Bundle.mapboxNavigation
-        zoomOutButton.image = UIImage(named: "carplay_minus", in: bundle, compatibleWith: traitCollection)
+        let imageName = switch traitCollection.userInterfaceStyle {
+        case .light:
+            "carplay_minus_light"
+        case .dark, .unspecified:
+            "carplay_minus_dark"
+        @unknown default:
+            "carplay_minus_dark"
+        }
+        zoomOutButton.image = UIImage(named: imageName, in: bundle, compatibleWith: traitCollection)
 
         return zoomOutButton
-    }()
+    }
 
     /// The map button property for hiding or showing the pan map button.
     public internal(set) var panMapButton: CPMapButton?
@@ -131,7 +150,15 @@ open class CarPlayMapViewController: UIViewController {
         }
 
         let bundle = Bundle.mapboxNavigation
-        panButton.image = UIImage(named: "carplay_pan", in: bundle, compatibleWith: traitCollection)
+        let imageName = switch traitCollection.userInterfaceStyle {
+        case .light:
+            "carplay_pan_light"
+        case .dark, .unspecified:
+            "carplay_pan_dark"
+        @unknown default:
+            "carplay_pan_dark"
+        }
+        panButton.image = UIImage(named: imageName, in: bundle, compatibleWith: traitCollection)
 
         return panButton
     }
@@ -176,6 +203,7 @@ open class CarPlayMapViewController: UIViewController {
         self.styles = styles
         super.init(nibName: nil, bundle: nil)
         self.sessionConfiguration = CPSessionConfiguration(delegate: self)
+        navigationMapView.update(navigationCameraState: .following)
     }
 
     /// Returns nil.
@@ -190,6 +218,10 @@ open class CarPlayMapViewController: UIViewController {
         unsubscribeFromFreeDriveNotifications()
     }
 
+    private var pointAnnotationManager: PointAnnotationManager?
+    private var pointAnnotations: [PointAnnotation] = []
+    private lazy var searchResultAnnotations = PointAnnotationsStorage<SearchResultAnnotation>()
+
     private var lifetimeSubscriptions: Set<AnyCancellable> = []
 
     func setupNavigationMapView() {
@@ -202,17 +234,32 @@ open class CarPlayMapViewController: UIViewController {
         )
 
         navigationMapView.delegate = self
-        navigationMapView.mapView.mapboxMap.onStyleLoaded.sink { [weak navigationMapView] _ in
-            navigationMapView?.localizeLabels()
+        navigationMapView.mapView.mapboxMap.onStyleLoaded.sink { [weak self] _ in
+            guard let self else { return }
+            navigationMapView.localizeLabels()
+
+            if pointAnnotationManager == nil {
+                // Creating only once becase annotations persist across style changes
+                pointAnnotationManager = navigationMapView.mapView.annotations.makePointAnnotationManager()
+
+                if pointAnnotations.count != 0,
+                   let pointAnnotationManager
+                {
+                    pointAnnotationManager.annotations = pointAnnotations
+                    pointAnnotations = []
+                }
+            }
+
         }.store(in: &lifetimeSubscriptions)
 
-        navigationMapView.puckType = .puck2D(.navigationDefault)
+        navigationMapView.puckType = .puck2D(.navigationCarPlayDefault)
 
         navigationMapView.mapView.ornaments.options.logo.visibility = .hidden
         navigationMapView.mapView.ornaments.options.attributionButton.visibility = .hidden
         navigationMapView.mapView.ornaments.options.compass.visibility = .hidden
 
         view = navigationMapView
+        delegate?.carPlayMapViewController(self, didSetup: navigationMapView)
     }
 
     func setupStyleManager() {
@@ -235,8 +282,8 @@ open class CarPlayMapViewController: UIViewController {
             equalTo: view.trailingAnchor,
             constant: -8
         )
-        speedLimitView.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        speedLimitView.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        speedLimitView.widthAnchor.constraint(equalToConstant: 80).isActive = true
+        speedLimitView.heightAnchor.constraint(equalToConstant: 80).isActive = true
 
         self.speedLimitView = speedLimitView
     }
@@ -377,6 +424,135 @@ open class CarPlayMapViewController: UIViewController {
 
         super.updateViewConstraints()
     }
+
+    func showSearchResultsAnnotations(
+        with records: [SearchResultRecord]?,
+        selectedResult: SearchResultRecord?
+    ) {
+        guard let records else {
+            removeSearchResultsAnnotations()
+            return
+        }
+
+        let selectedImage = UIImage(
+            named: "carplay_pin_selected", in: .mapboxNavigation, with: nil
+        ) ?? UIImage()
+        let image = UIImage(
+            named: "car_play_pin_regular",
+            in: .mapboxNavigation,
+            with: nil
+        ) ?? UIImage()
+
+        do {
+            if navigationMapView.mapView.mapboxMap.image(withId: Constants.searchAnnotationImage) == nil {
+                try navigationMapView.mapView.mapboxMap.addImage(
+                    image,
+                    id: Constants.searchAnnotationImage,
+                    sdf: false,
+                    stretchX: [],
+                    stretchY: []
+                )
+            }
+            if navigationMapView.mapView.mapboxMap.image(withId: Constants.selectedSearchAnnotationImage) == nil {
+                try navigationMapView.mapView.mapboxMap.addImage(
+                    selectedImage,
+                    id: Constants.selectedSearchAnnotationImage,
+                    sdf: false,
+                    stretchX: [],
+                    stretchY: []
+                )
+            }
+        } catch {
+            Log.error(
+                "Failed to add search annotations with error: \(error.localizedDescription).",
+                category: .navigationUI
+            )
+            return
+        }
+
+        let annotationIds = searchResultAnnotations.ids
+        let currentAnnotations = pointAnnotationManager?.annotations ?? pointAnnotations
+        let remainingAnnotations = currentAnnotations.filter {
+            !annotationIds.contains($0.id)
+        }
+        searchResultAnnotations.removeAll()
+        let searchAnnotations = records.map { record -> PointAnnotation in
+
+            if record.id == selectedResult?.id {
+                var annotation = searchResultAnnotations.create(.init(searchResultRecord: record))
+                annotation.textColor = .init(.white)
+                annotation.textAnchor = .center
+                annotation.textSize = 14.0
+                annotation = annotation.textOffset(x: 0, y: -0.4)
+                annotation.image = .init(
+                    image: selectedImage,
+                    name: Constants.selectedSearchAnnotationImage
+                )
+                annotation.textField = record.indexStringValue
+                annotation.symbolSortKey = Double(records.count + 1)
+                return annotation
+            } else {
+                var annotation = searchResultAnnotations.create(.init(searchResultRecord: record))
+                annotation.textColor = .init(.white)
+                annotation.textAnchor = .center
+                annotation.textSize = 11.2
+                annotation = annotation.textOffset(x: 0, y: -0.3)
+                annotation.image = .init(
+                    image: image,
+                    name: Constants.searchAnnotationImage
+                )
+                let index = (record.serverIndex ?? 0) % records.count
+                annotation.symbolSortKey = Double(records.count - index)
+                annotation.textField = record.indexStringValue
+                return annotation
+            }
+        }
+        let annotations = searchAnnotations + remainingAnnotations
+        if let pointAnnotationManager {
+            pointAnnotationManager.annotations = annotations
+        } else {
+            pointAnnotations = annotations
+        }
+
+        fitCameraToSearchResults(searchResults: records)
+    }
+
+    func removeSearchResultsAnnotations() {
+        guard !searchResultAnnotations.isEmpty else { return }
+
+        let annotationIds = searchResultAnnotations.ids
+        pointAnnotationManager?.annotations = []
+        searchResultAnnotations.removeAll()
+        navigationMapView.navigationCamera.update(cameraState: .following)
+    }
+
+    func fitCameraToSearchResults(searchResults: [SearchResultRecord]) {
+        navigationMapView.navigationCamera.stop()
+        let initialCameraOptions = CameraOptions(
+            padding: navigationMapView.navigationCamera.viewportPadding,
+            bearing: 0,
+            pitch: 0
+        )
+        let coordinates = searchResults.map { $0.coordinate }
+        do {
+            let cameraOptions = try navigationMapView.mapView.mapboxMap.camera(
+                for: coordinates,
+                camera: initialCameraOptions,
+                coordinatesPadding: nil,
+                maxZoom: nil,
+                offset: nil
+            )
+            navigationMapView.mapView.camera.ease(to: cameraOptions, duration: 0.0)
+        } catch {
+            Log.error("Failed to fit the camera: \(error.localizedDescription)", category: .navigationUI)
+        }
+    }
+
+    private enum Constants {
+        static let identifier = "com.mapbox.navigation.carplay"
+        static let searchAnnotationImage = "\(identifier).search_annotation"
+        static let selectedSearchAnnotationImage = "\(identifier).search_annotation_selected"
+    }
 }
 
 // MARK: StyleManagerDelegate Methods
@@ -409,18 +585,6 @@ extension CarPlayMapViewController: StyleManagerDelegate {
 // MARK: NavigationMapViewDelegate Methods
 
 extension CarPlayMapViewController: NavigationMapViewDelegate {
-    public func navigationMapView(
-        _ navigationMapView: NavigationMapView,
-        didAdd finalDestinationAnnotation: PointAnnotation,
-        pointAnnotationManager: PointAnnotationManager
-    ) {
-        delegate?.carPlayMapViewController(
-            self,
-            didAdd: finalDestinationAnnotation,
-            pointAnnotationManager: pointAnnotationManager
-        )
-    }
-
     public func navigationMapView(
         _ navigationMapView: NavigationMapView,
         shapeFor waypoints: [Waypoint],

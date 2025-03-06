@@ -1,5 +1,189 @@
 # Changes to the Mapbox Navigation SDK for iOS
 
+## v3.8.0-beta.1
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxMaps v11.11.0-beta.1](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.11.0-beta.1).
+* MapboxNavigationCore now requires [MapboxNavigationNative v324.0.0-beta.1](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/324.0.0-beta.1).
+
+### Audio
+
+* Improved AVAudioSession handling for playback of the reroute sound and voice instructions. Activation and deactivation of AVAudioSession no longer occur on the main thread, and these operations are synchronized. This eliminates UI freezes that occurred to a lesser extent during activation and to a greater extent during deactivation.
+
+### Routing
+
+* `Waypoint` object is extended with `TimeZoneInformation`.
+
+### API Deprecations
+
+* The extension for AVAudioSession is no longer supported and has been deprecated, which affects the following methods:
+    * `AVAudioSession.tryDuckAudio()`
+    * `AVAudioSession.tryUnduckAudio()`
+    
+### CarPlay
+
+* Forwarded shapes for waypoints from `CarPlayNavigationViewControllerDelegate` to `NavigationMapViewDelegate`.
+
+### Simulation
+
+* Fixed case when route refresh or an alternative route selection causes the simulation progress reset.
+
+## v3.7.0
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxMaps v11.10.0](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.10.0).
+* MapboxNavigationCore now requires [MapboxNavigationNative v323.0.0](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/323.0.0).
+
+### API deprecations:
+
+* `MapboxCopilot.startActiveGuidanceSession(requestIdentifier:route:searchResultUsed:)`, `MapboxCopilot.startFreeDriveSession()`, and `MapboxCopilot.completeNavigationSession()` are deprecated in favor of `MapboxCopilot.startActiveGuidanceSessionAsync(requestIdentifier:route:searchResultUsed:)`, `MapboxCopilot.startFreeDriveSessionAsync()`, `MapboxCopilot.completeNavigationSessionAsync()`. Using deprecated methods may lead to losing events in the recorded history files.
+* The following methods are deprecated and should no longer be used, as the final destination annotation is no longer added to the map:
+    * `NavigationViewControllerDelegate.navigationViewController(_:didAdd:pointAnnotationManager:)`
+    * `CarPlayNavigationViewControllerDelegate.carPlayNavigationViewController(_:didAdd:pointAnnotationManager:)`
+    * `CarPlayMapViewControllerDelegate.carPlayMapViewController(_:didAdd:pointAnnotationManager:)`
+    * `CarPlayManagerDelegate.carPlayManager(_:didAdd:to:pointAnnotationManager:)`
+
+### CarPlay: 
+* Deprecated following methods which return `CPTemplate`:  
+    * `CarPlayManagerDelegate.carPlayManager(_:leadingNavigationBarButtonsCompatibleWith:in:for:)`
+    * `CarPlayManagerDelegate.carPlayManager(_:trailingNavigationBarButtonsCompatibleWith:in:for:)`
+* Introduced new methods which return `CPMapTemplate`: 
+    * `CarPlayManagerDelegate.carPlayManager(_:leadingNavigationBarButtonsCompatibleWith:in:for:)`
+    * `CarPlayManagerDelegate.carPlayManager(_:trailingNavigationBarButtonsCompatibleWith:in:for:)` 
+
+### Other changes
+
+* Updated alternative routes preview mode for CarPlay.
+* Fixed the movement type reported to the Telemetry.
+* Fixed possible threading errors when sending Telemetry feedback events.
+* Fixed a bug when the Copilot session recording could stop right after it was started.
+* Fixed a possible crash in `SimulatedLocationManager` when starting the simulation at the point on the route far away from the start.
+* Fixed possible not thread-safe memory access in `SimulatedLocationManager`.
+* Improved route refreshing by removing unnecessary internal navigator update on refresh.
+* Fixed possible not thread-safe memory access to `RouteProgress` in `NavigationController`.
+>>>>>>> 98ac228f99 (Update versions (#8200))
+
+## v3.7.0-rc.1
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxMaps v11.10.0-rc.1](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.10.0-rc.1).
+* MapboxNavigationCore now requires [MapboxNavigationNative v323.0.0-rc.1](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/323.0.0-rc.1).
+
+### Other changes
+
+* Fixed possible not thread-safe memory access in `SimulatedLocationManager`.
+* Improved route refreshing by removing unnecessary internal navigator update on refresh.
+* Fixed possible not thread-safe memory access to `RouteProgress` in `NavigationController`.
+
+## v3.7.0-beta.1
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxMaps v11.10.0-beta.1](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.10.0-beta.1).
+* MapboxNavigationCore now requires [MapboxNavigationNative v323.0.0-beta.2](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/323.0.0-beta.2).
+
+### API deprecations:
+
+* `MapboxCopilot.startActiveGuidanceSession(requestIdentifier:route:searchResultUsed:)`, `MapboxCopilot.startFreeDriveSession()`, and `MapboxCopilot.completeNavigationSession()` are deprecated in favor of `MapboxCopilot.startActiveGuidanceSessionAsync(requestIdentifier:route:searchResultUsed:)`, `MapboxCopilot.startFreeDriveSessionAsync()`, `MapboxCopilot.completeNavigationSessionAsync()`. Using deprecated methods may lead to losing events in the recorded history files.
+* The following methods are deprecated and should no longer be used, as the final destination annotation is no longer added to the map:
+    * `NavigationViewControllerDelegate.navigationViewController(_:didAdd:pointAnnotationManager:)`
+    * `CarPlayNavigationViewControllerDelegate.carPlayNavigationViewController(_:didAdd:pointAnnotationManager:)`
+    * `CarPlayMapViewControllerDelegate.carPlayMapViewController(_:didAdd:pointAnnotationManager:)`
+    * `CarPlayManagerDelegate.carPlayManager(_:didAdd:to:pointAnnotationManager:)`
+
+### CarPlay: 
+* Deprecated following methods which return `CPTemplate`:  
+    * `CarPlayManagerDelegate.carPlayManager(_:leadingNavigationBarButtonsCompatibleWith:in:for:)`
+    * `CarPlayManagerDelegate.carPlayManager(_:trailingNavigationBarButtonsCompatibleWith:in:for:)`
+* Introduced new methods which return `CPMapTemplate`: 
+    * `CarPlayManagerDelegate.carPlayManager(_:leadingNavigationBarButtonsCompatibleWith:in:for:)`
+    * `CarPlayManagerDelegate.carPlayManager(_:trailingNavigationBarButtonsCompatibleWith:in:for:)` 
+    
+
+### Other changes
+
+* Updated alternative routes preview mode for CarPlay.
+* Fixed the movement type reported to the Telemetry.
+* Fixed possible threading errors when sending Telemetry feedback events.
+* Fixed a bug when the Copilot session recording could stop right after it was started.
+* Fixed a possible crash in `SimulatedLocationManager` when starting the simulation at the point on the route far away from the start.
+
+## v3.6.1
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxMaps v11.9.1](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.9.1).
+* MapboxNavigationCore now requires [MapboxNavigationNative v322.1.0](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/322.1.0).
+
+### Other changes
+
+* Fixed the behavior when `NavigationViewController` transitions navigation to the `idle` state when its presented controllers disappear. Instead, it happens only when it disappears.
+
+## v3.6.0
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxMaps v11.9.0](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.9.0).
+* MapboxNavigationCore now requires [MapboxNavigationNative v322.0.0](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/322.0.0).
+
+### Map
+
+* Improved support for tapping POI features in the Standard Style.
+
+## v3.6.0-rc.1
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxMaps v11.9.0-rc.1](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.9.0-rc.1).
+* MapboxNavigationCore now requires [MapboxNavigationNative v322.0.0-rc.1](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/322.0.0-rc.1).
+
+### API deprecations:
+
+* `RerouteConfig.optionsCustomization` is deprecated in favor of `RerouteConfig.urlOptionsCustomization`. Using the deprecated `optionsCustomization` may lead to losing custom query items at reroutes.
+
+### Routing
+
+* Supported the updated native route refresh mechanism.
+
+### Other changes
+
+* Improve the handling of canceled tasks when requesting `NavigationRoutes`.
+
+## v3.6.0-beta.1
+
+### Packaging
+
+* MapboxNavigationCore now requires [MapboxMaps v11.9.0-beta.1](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.9.0-beta.1).
+* MapboxNavigationCore now requires [MapboxNavigationNative v322.0.0-beta.1](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/322.0.0-beta.1).
+
+### ⚠️ Behavioral Changes ⚠️:
+* The default intermediate waypoint appearance is now a circle without the pin icon. To customize the appearance of intermediate waypoints
+    follow steps from `NavigationMapViewDelegate.navigationMapView(_:shapeFor:legIndex:)` documentation.
+
+### Map
+
+* Fixed the case when intermediate waypoints can be displayed under the route line in map styles with no slot support.
+* Fixed the case when `NavigationMapView.customRouteLineLayerPosition` was not applied in runtime.
+* Fixed possible alternative route annotation position on the main route.
+
+### CarPlay
+
+* Added new CarPlay icons.
+* Added logic to automatically recenter puck after canceling preview mode.
+* Fixed Car Play route does not properly cancel when navigating solely from the Car Play application.
+* Added a new style for the puck and maneuver banner. 
+
+### Other
+
+* Fixed incorrect SDK naming for the UX and UIKit frameworks. Previously, the SDK name `mapbox-navigationCore-ios` was mistakenly used for these frameworks.
+* Fixed street names filtering by user's language.
+* Improved history trace events.
+* Fixed refreshing annotation of alternative routes.
+* Avoided skipping of not passed instructions on teleports along the route.
+
 ## v3.5.0
 
 ### Packaging
@@ -31,7 +215,7 @@
 ### API deprecations:
 
 * `NavigationMapView.pointAnnotationManager` property is deprecated and should no longer be used, as the final destination annotation is no longer added to the map.
-* `NavigationMapView.navigationMapView(_, didAdd:pointAnnotationManager:)` method is deprecated and should no longer be used, as the final destination annotation is no longer added to the map.
+* `NavigationMapViewDelegate.navigationMapView(_:didAdd:pointAnnotationManager:)` method is deprecated and should no longer be used, as the final destination annotation is no longer added to the map.
 
 ### CarPlay:
 
@@ -320,6 +504,49 @@
 * MapboxNavigation now requires [MapboxMaps v11.3.0](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v11.3.0).
 * MapboxNavigation now requires [MapboxCommon v24.3.1](https://github.com/mapbox/mapbox-common-ios/releases/tag/v24.3.1).
 * MapboxCoreNavigation now requires [MapboxNavigationNative v305._x_](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/305.0.0).
+
+## v2.19.0
+
+### Packaging
+
+* MapboxCoreNavigation now requires [MapboxNavigationNative v206._x_](https://github.com/mapbox/mapbox-navigation-native-ios/releases/tag/206.0.1). ([#4718](https://github.com/mapbox/mapbox-navigation-ios/pull/4718))
+* MapboxNavigation now requires [MapboxMaps v10.18.2](https://github.com/mapbox/mapbox-maps-ios/releases/tag/v10.18.2). ([#4718](https://github.com/mapbox/mapbox-navigation-ios/pull/4718))
+
+### Routing
+
+* Added handling `RouteResponse.refreshTTL` into account when refreshing a route. Now it will no longer be possible to attmept to refresh and outdated route, and `Router` will inform that current route has expired using `RouterDelegate.routerDidFailToRefreshExpiredRoute(:_)` method. ([#4672](https://github.com/mapbox/mapbox-navigation-ios/pull/4672))
+
+### Other changes
+* Fixed next banner view correctly appearing when steps list view is expanded. ([#4708](https://github.com/mapbox/mapbox-navigation-ios/pull/4708))
+* Fixed rare route simulation issue where user's speed was calculated and NaN and the puck did not move. ([#4708](https://github.com/mapbox/mapbox-navigation-ios/pull/4708))
+* Fixed a possibly not-updating `StepsViewController` after reroutes when using a custom top bar. ([#4716](https://github.com/mapbox/mapbox-navigation-ios/pull/4716))
+* Improved completion detection via locating matched point near leg end if a point was not located on the current leg. ([#4718](https://github.com/mapbox/mapbox-navigation-ios/pull/4718))
+
+## v2.18.4
+
+### Packaging
+
+* Add support for building with Xcode 16 beta.
+
+## v2.18.3
+
+### Packaging
+
+* Fixed MapboxMaps version compatibility in CocoaPods to match SPM. MapboxNavigation in CocoaPods is now compatible with MapboxMaps starting from v10.17.0 to v11.0.0 not including.
+* Fixed MapboxDirections version compatibility in CocoaPods to match SPM. MapboxDirections in CocoaPods is now compatible with MapboxDirections starting from v2.12.0 to v3.0.0 not including.
+* Fixed MapboxNavigationNative version compatibility in CocoaPods to match SPM. MapboxNavigationNative in CocoaPods is now compatible with MapboxNavigationNative starting from v204.0.1 to v205.0.0 not including.
+
+## v2.18.2
+
+### CarPlay
+
+* Fixed CarPlay crash when calling `CarPlayManager.routePreview()` function for iOS 14+.
+
+## v2.18.1
+
+### CarPlay
+
+* Partially fixed CarPlay crash when calling `CarPlayManager.routePreview()` function.
 
 ## v2.18.0
 

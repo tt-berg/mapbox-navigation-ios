@@ -23,6 +23,7 @@ public final class CoreNavigatorMock: CoreNavigator {
 
     public var passedElectronicHorizonConfig: ElectronicHorizonConfig?
 
+    @MainActor
     public init() {
         let configHandle = ConfigHandle.mock()
         self.cacheHandle = CacheFactory.build(
@@ -43,6 +44,7 @@ public final class CoreNavigatorMock: CoreNavigator {
             cache: cacheHandle,
             historyRecorder: nil
         )
+        self.rerouteController = .mock(navigator: .mock())
         self.roadObjectMatcher = .init(MapboxNavigationNative.RoadObjectMatcher(cache: cacheHandle))
         self.roadObjectStore = .init(nativeNavigator.roadObjectStore())
         self.roadGraph = .init(MapboxNavigationNative.GraphAccessor(cache: cacheHandle))
@@ -105,6 +107,11 @@ public final class CoreNavigatorMock: CoreNavigator {
         uuid: UUID,
         completion: @escaping @Sendable (Result<RoutesCoordinator.RoutesResult, any Error>) -> Void
     ) {
+        unsetRoutesCalled = true
+        passedUuid = uuid
+    }
+
+    public func unsetRoutes(uuid: UUID) async throws {
         unsetRoutesCalled = true
         passedUuid = uuid
     }

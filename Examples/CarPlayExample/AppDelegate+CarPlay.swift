@@ -93,6 +93,18 @@ class CarPlaySceneDelegate: NSObject, CPTemplateApplicationSceneDelegate {
 
 extension AppDelegate: CarPlayManagerDelegate {
     func carPlayManager(
+        _ carPlayManager: MapboxNavigationUIKit.CarPlayManager,
+        leadingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
+        in carPlayTemplate: CPMapTemplate,
+        for activity: MapboxNavigationUIKit.CarPlayActivity,
+        cameraState: MapboxNavigationCore.NavigationCameraState
+    ) -> [CPBarButton]? {
+        return nil
+    }
+
+    func carPlayManager(_ carPlayManager: CarPlayManager, didSetup navigationMapView: NavigationMapView) {}
+
+    func carPlayManager(
         _ carPlayManager: CarPlayManager,
         selectedPreviewFor trip: CPTrip,
         using routeChoice: CPRouteChoice
@@ -106,6 +118,13 @@ extension AppDelegate: CarPlayManagerDelegate {
             return true
         }
         return routes != currentRoutes
+    }
+
+    func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        guidanceBackgroundColorFor style: UIUserInterfaceStyle
+    ) -> UIColor? {
+        #colorLiteral(red: 0.08061028272, green: 0.4138993621, blue: 0.8905753493, alpha: 1)
     }
 
     func carPlayManagerWillCancelPreview(
@@ -147,6 +166,7 @@ extension AppDelegate: CarPlayManagerDelegate {
         byCanceling canceled: Bool
     ) {
         // Dismiss NavigationViewController if it's present in the navigation stack
+        navigationProvider.tripSession().setToIdle()
         currentAppRootViewController?.dismissActiveNavigationViewController()
     }
 
@@ -157,7 +177,7 @@ extension AppDelegate: CarPlayManagerDelegate {
     func carPlayManager(
         _ carPlayManager: CarPlayManager,
         leadingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
-        in template: CPTemplate,
+        in template: CPMapTemplate,
         for activity: CarPlayActivity
     ) -> [CPBarButton]? {
         guard let interfaceController = self.carPlayManager.interfaceController else {
@@ -245,7 +265,7 @@ extension AppDelegate: CarPlayManagerDelegate {
     func carPlayManager(
         _ carPlayManager: CarPlayManager,
         trailingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
-        in template: CPTemplate,
+        in template: CPMapTemplate,
         for activity: CarPlayActivity
     ) -> [CPBarButton]? {
         switch activity {

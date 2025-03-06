@@ -94,6 +94,10 @@ final class NativeHandlersFactory: @unchecked Sendable {
         historyDirectoryURL.flatMap {
             HistoryRecorderHandle.build(
                 forHistoryDir: $0.path,
+                sdkInfo: SdkHistoryInfo(
+                    sdkVersion: Bundle.mapboxNavigationVersion,
+                    sdkName: Bundle.resolvedNavigationSDKName
+                ),
                 config: configHandle(by: configFactoryType)
             )
         }
@@ -209,7 +213,8 @@ final class NativeHandlersFactory: @unchecked Sendable {
             polling: pollingConfig,
             incidentsOptions: nativeIncidentsOptions,
             noSignalSimulationEnabled: nil,
-            useSensors: NSNumber(booleanLiteral: utilizeSensorData)
+            useSensors: NSNumber(booleanLiteral: utilizeSensorData),
+            rerouteStrategyForMatchRoute: .rerouteDisabled // TODO: support rerouteStrategyForMatchRoute
         )
     }
 
@@ -217,6 +222,7 @@ final class NativeHandlersFactory: @unchecked Sendable {
         let defaultConfig = [
             customConfigFeaturesKey: [
                 "useInternalReroute": true,
+                "useInternalRouteRefresh": true,
                 "useTelemetryNavigationEvents": true,
             ],
             "navigation": [
@@ -229,10 +235,10 @@ final class NativeHandlersFactory: @unchecked Sendable {
         ]
 
         var customConfig = UserDefaults.standard.dictionary(forKey: customConfigKey) ?? [:]
-        customConfig.deepMerge(with: defaultConfig, uniquingKeysWith: { first, _ in first })
+        customConfig.deepMerge(with: defaultConfig, uniquingKeysWith: { _, defaultConfigValue in defaultConfigValue })
 
         let customConfigJSON: String
-        if let jsonDataConfig = try? JSONSerialization.data(withJSONObject: customConfig, options: []),
+        if let jsonDataConfig = try? JSONSerialization.data(withJSONObject: customConfig, options: [.sortedKeys]),
            let encodedConfig = String(data: jsonDataConfig, encoding: .utf8)
         {
             customConfigJSON = encodedConfig
@@ -255,6 +261,9 @@ final class NativeHandlersFactory: @unchecked Sendable {
 
     @MainActor
     func telemetry(eventsMetadataProvider: EventsMetadataInterface) -> Telemetry {
+        // TODO: The Nav SDK annotates `native` as MainActor, but telemetry can be
+        // sent from the background thread. We should create Telemetry from the same thread
+        // as it will later send feedback
         navigator.native.getTelemetryForEventsMetadataProvider(eventsMetadataProvider)
     }
 }

@@ -1,6 +1,7 @@
 import CoreLocation
 import Foundation
 @_spi(MapboxInternal) @testable import MapboxNavigationCore
+import XCTest
 
 public final class NavigationTelemetryManagerSpy: NavigationTelemetryManager {
     public var userInfo: [String: String?]?
@@ -11,6 +12,9 @@ public final class NavigationTelemetryManagerSpy: NavigationTelemetryManager {
     var sendActiveNavigationFeedbackCalled = false
     var createFeedbackCalled = false
     var sendNavigationFeedbackCalled = false
+
+    var sendCarPlayConnectExpectation: XCTestExpectation?
+    var sendCarPlayDisconnectExpectation: XCTestExpectation?
 
     var returnedFeedbackEvent: FeedbackEvent? = Fixture.createFeedbackEvent()
     var returnedUserFeedback: MapboxNavigationCore.UserFeedback = .init(
@@ -30,12 +34,14 @@ public final class NavigationTelemetryManagerSpy: NavigationTelemetryManager {
 
     init() {}
 
-    public func sendCarPlayConnectEvent() {
+    public func sendCarPlayConnectEvent() async {
         sendCarPlayConnectEventCalled = true
+        sendCarPlayConnectExpectation?.fulfill()
     }
 
-    public func sendCarPlayDisconnectEvent() {
+    public func sendCarPlayDisconnectEvent() async {
         sendCarPlayDisconnectEventCalled = true
+        sendCarPlayDisconnectExpectation?.fulfill()
     }
 
     public func createFeedback(screenshotOption: FeedbackScreenshotOption) async -> MapboxNavigationCore

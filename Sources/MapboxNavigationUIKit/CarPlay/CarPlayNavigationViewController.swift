@@ -648,6 +648,8 @@ open class CarPlayNavigationViewController: UIViewController {
             navigationMapView.showsTrafficOnRouteLine = false
         }.store(in: &lifetimeSubscriptions)
 
+        navigationMapView.puckType = .puck3D(.navigationCarPlayDefault)
+
         navigationMapView.mapView.ornaments.options.compass.visibility = .hidden
         navigationMapView.mapView.ornaments.options.logo.visibility = .hidden
         navigationMapView.mapView.ornaments.options.attributionButton.visibility = .hidden
@@ -818,6 +820,9 @@ open class CarPlayNavigationViewController: UIViewController {
             timeRemaining: step.expectedTravelTime
         )
 
+        if #available(iOS 15.4, *) {
+            primaryManeuver.cardBackgroundColor = #colorLiteral(red: 0.07450980392, green: 0.3137254902, blue: 0.7843137255, alpha: 1)
+        }
         // Just incase, set some default text
         var text = visualInstruction.primaryInstruction.text ?? step.instructions
         if let secondaryText = visualInstruction.secondaryInstruction?.text {
@@ -1077,13 +1082,13 @@ extension CarPlayNavigationViewController: NavigationMapViewDelegate {
 
     public func navigationMapView(
         _ navigationMapView: NavigationMapView,
-        didAdd finalDestinationAnnotation: PointAnnotation,
-        pointAnnotationManager: PointAnnotationManager
-    ) {
+        shapeFor waypoints: [Waypoint],
+        legIndex: Int
+    ) -> FeatureCollection? {
         delegate?.carPlayNavigationViewController(
             self,
-            didAdd: finalDestinationAnnotation,
-            pointAnnotationManager: pointAnnotationManager
+            shapeFor: waypoints,
+            legIndex: legIndex
         )
     }
 
